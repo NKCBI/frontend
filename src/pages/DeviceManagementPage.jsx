@@ -10,7 +10,6 @@ function DeviceManagementPage() {
     const loadDevices = async () => {
         setIsLoading(true);
         try {
-            // Correctly destructure the data from the axios response
             const { data: devicesData } = await api.getDevices();
             setDevices(devicesData);
         } catch (error) {
@@ -29,6 +28,8 @@ function DeviceManagementPage() {
     };
 
     const handleMonitorToggle = async (cameraId, currentStatus) => {
+        // --- LOGGING ADDED ---
+        console.log(`[FRONTEND] handleMonitorToggle called. Camera ID: ${cameraId}, Current Status: ${currentStatus}. Sending NEW status: ${!currentStatus}`);
         try {
             await api.updateCameraMonitorStatus(cameraId, !currentStatus);
             setDevices(prevDevices => prevDevices.map(site => ({
@@ -106,4 +107,3 @@ function DeviceManagementPage() {
 }
 
 export default DeviceManagementPage;
-

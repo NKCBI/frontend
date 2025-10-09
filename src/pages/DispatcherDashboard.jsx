@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { api } from '../api.js';
 import { useAuth } from '../context/AuthContext.jsx';
-import { LogOut, ChevronDown, ChevronRight, Send, PanelLeftClose, PanelRightClose, Video, Grid3x3, LayoutGrid, Loader2, AlertTriangle, RefreshCw } from 'lucide-react';
+import { LogOut, ChevronDown, ChevronRight, Send, PanelLeftClose, PanelRightClose, Video, Grid3x3, LayoutGrid, Loader2, AlertTriangle, RefreshCw, X } from 'lucide-react';
 
 // --- Helper Functions & Constants ---
 const getWsUrl = () => {
@@ -32,6 +32,10 @@ function DispatcherDashboard() {
     const alertTimeoutRef = useRef(null);
     const viewModeRef = useRef(viewMode);
     
+    // --- CHANGE 1: Add refs to manage reconnection state ---
+    const reconnectTimeoutRef = useRef(null);
+    const reconnectAttemptRef = useRef(0);
+    
     useEffect(() => {
         viewModeRef.current = viewMode;
     }, [viewMode]);
@@ -41,7 +45,7 @@ function DispatcherDashboard() {
         monitoredDevicesRef.current = monitoredDevices;
     }, [monitoredDevices]);
 
-    // Function to play a simple alert sound
+    // ... existing helper functions ...
     const playAlertSound = () => {
         if (!audioContextRef.current) {
             try { audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)(); }
@@ -58,7 +62,6 @@ function DispatcherDashboard() {
         oscillator.stop(audioContextRef.current.currentTime + 0.5);
     };
     
-    // Adapts the alert format from the server for frontend use
     const adaptServerAlert = (serverAlert) => {
         const turingData = serverAlert.originalData;
         let snapshotUrl = `https://placehold.co/600x400/111827/9CA3AF?text=No+Snapshot`;
@@ -68,7 +71,6 @@ function DispatcherDashboard() {
         return { ...serverAlert, id: serverAlert._id, type: turingData.event_type?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'Unknown Event', cameraName: turingData.camera?.name || 'Unknown Camera', cameraId: turingData.camera?.id, snapshotUrl: snapshotUrl };
     };
 
-    // Helper to find a camera by its ID across all sites
     const findCameraById = (cameraId) => {
         for (const site of monitoredDevicesRef.current) {
             const camera = site.cameras.find(c => c.id === cameraId);
@@ -77,7 +79,6 @@ function DispatcherDashboard() {
         return { camera: null, site: null };
     };
 
-    // Handlers for changing the view mode
     const handleFocusCamera = (cameraToFocus, site) => {
         if (!cameraToFocus) return;
         setViewMode('focus');
@@ -107,72 +108,105 @@ function DispatcherDashboard() {
         if (camera && site) handleFocusCamera(camera, site);
     };
 
-    // Effect for handling the alert WebSocket connection
+    // --- CHANGE 2: The WebSocket connection logic is now wrapped in its own function and handles reconnection ---
     useEffect(() => {
         const token = localStorage.getItem('authToken');
         const wsUrl = getWsUrl();
-        const socket = new WebSocket(`${wsUrl}?token=${token}`);
-        socketRef.current = socket;
 
-        socket.onopen = () => setConnectionStatus('Connected');
-        socket.onclose = () => setConnectionStatus('Disconnected');
-        socket.onerror = (error) => {
-            console.error('WebSocket Error:', error);
-            setConnectionStatus('Error');
+        const connect = () => {
+            console.log(`[WebSocket] Attempting to connect... (Attempt: ${reconnectAttemptRef.current + 1})`);
+            setConnectionStatus('Connecting...');
+            const socket = new WebSocket(`${wsUrl}?token=${token}`);
+            socketRef.current = socket;
+
+            socket.onopen = () => {
+                console.log('[WebSocket] Connection established.');
+                setConnectionStatus('Connected');
+                reconnectAttemptRef.current = 0; // Reset counter on successful connection
+            };
+
+            socket.onclose = () => {
+                console.warn('[WebSocket] Connection closed.');
+                setConnectionStatus('Disconnected');
+                
+                // Exponential backoff reconnection logic
+                const delay = Math.min(30000, (2 ** reconnectAttemptRef.current) * 2000); // 2s, 4s, 8s, up to 30s
+                console.log(`[WebSocket] Will attempt to reconnect in ${delay / 1000} seconds.`);
+                
+                reconnectAttemptRef.current++;
+                reconnectTimeoutRef.current = setTimeout(connect, delay);
+            };
+
+            socket.onerror = (error) => {
+                console.error('[WebSocket] Error:', error);
+                setConnectionStatus('Error');
+                // The onclose event will fire immediately after onerror, so the reconnection logic will be triggered there.
+                socket.close();
+            };
+
+            socket.onmessage = (event) => {
+                const message = JSON.parse(event.data);
+                const adaptedAlert = adaptServerAlert(message.alert);
+                
+                if (message.type === 'new_alert') {
+                    setAlerts(prev => prev.some(a => a.id === adaptedAlert.id) ? prev : [adaptedAlert, ...prev]);
+                    setActiveAlert(adaptedAlert);
+                    setIsModalOpen(true);
+                    playAlertSound();
+                    if (viewModeRef.current === 'videoWall') {
+                        setAlertingCameraId(adaptedAlert.cameraId);
+                        if (alertTimeoutRef.current) clearTimeout(alertTimeoutRef.current);
+                        alertTimeoutRef.current = setTimeout(() => setAlertingCameraId(null), 10000);
+                    } else {
+                        const { camera, site } = findCameraById(adaptedAlert.cameraId);
+                        if (camera && site) handleFocusCamera(camera, site);
+                    }
+                } else if (message.type === 'update_alert') {
+                    setAlerts(prev => prev.map(a => a.id === adaptedAlert.id ? adaptedAlert : a));
+                    setActiveAlert(current => current?.id === adaptedAlert.id ? adaptedAlert : current);
+                }
+            };
         };
 
-        socket.onmessage = (event) => {
-            const message = JSON.parse(event.data);
-            const adaptedAlert = adaptServerAlert(message.alert);
-            
-            if (message.type === 'new_alert') {
-                setAlerts(prev => prev.some(a => a.id === adaptedAlert.id) ? prev : [adaptedAlert, ...prev]);
-                setActiveAlert(adaptedAlert);
-                setIsModalOpen(true);
-                playAlertSound();
-                if (viewModeRef.current === 'videoWall') {
-                    setAlertingCameraId(adaptedAlert.cameraId);
-                    if (alertTimeoutRef.current) clearTimeout(alertTimeoutRef.current);
-                    alertTimeoutRef.current = setTimeout(() => setAlertingCameraId(null), 10000);
-                } else {
-                    const { camera, site } = findCameraById(adaptedAlert.cameraId);
-                    if (camera && site) handleFocusCamera(camera, site);
-                }
-            } else if (message.type === 'update_alert') {
-                setAlerts(prev => prev.map(a => a.id === adaptedAlert.id ? adaptedAlert : a));
-                setActiveAlert(current => current?.id === adaptedAlert.id ? adaptedAlert : current);
+        connect(); // Initial connection attempt
+
+        return () => {
+            // --- CHANGE 3: Enhanced cleanup ---
+            console.log("[WebSocket] Cleaning up WebSocket connection and timers.");
+            if (reconnectTimeoutRef.current) {
+                clearTimeout(reconnectTimeoutRef.current);
+            }
+            if (socketRef.current) {
+                // Remove event listeners to prevent reconnection attempts after unmount
+                socketRef.current.onclose = null; 
+                socketRef.current.close();
+            }
+            if (alertTimeoutRef.current) {
+                clearTimeout(alertTimeoutRef.current);
             }
         };
-        
-        return () => {
-            console.log("Running WebSocket cleanup for connection:", socket.url);
-            socket.close(); // Close the specific socket instance from this effect.
-            if (alertTimeoutRef.current) clearTimeout(alertTimeoutRef.current);
-        };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    // --- MODIFIED ---
-    // Effect for fetching initial monitored devices
+    // ... other existing useEffects and handlers ...
     useEffect(() => {
         const fetchInitialData = async () => {
             try {
                 const response = await api.getMonitoredDevices();
-                // Defensively set the state to ensure it's always an array
                 if (Array.isArray(response.data)) {
                     setMonitoredDevices(response.data);
                 } else {
                     console.error("API did not return an array for monitored devices:", response.data);
-                    setMonitoredDevices([]); // Default to empty array on malformed response
+                    setMonitoredDevices([]);
                 }
             } catch (error) {
                 console.error("Failed to fetch initial data:", error);
-                setMonitoredDevices([]); // Also default to empty array on any thrown error
+                setMonitoredDevices([]);
             }
         };
         fetchInitialData();
     }, []);
 
-    // Functions to interact with the API for alerts
     const handleUpdateStatus = async (status) => {
         if (!activeAlert) return;
         try {
@@ -202,9 +236,9 @@ function DispatcherDashboard() {
         setOpenSites(prev => ({ ...prev, [siteId]: !prev[siteId] }));
     };
 
-    // Main JSX for the dashboard layout
     return (
         <div className="flex flex-col h-screen bg-gray-900 text-gray-200 font-sans">
+            {/* ... The rest of the JSX remains the same ... */}
             <header className="bg-gray-800 border-b border-gray-700 shadow-md">
                  <div className="mx-auto max-w-full px-4 sm:px-6 lg:px-8">
                     <div className="flex h-16 items-center justify-between">
@@ -256,7 +290,20 @@ function DispatcherDashboard() {
                     </div>
                 )}
                 
-                <div className="flex-1 p-4 flex flex-col items-center justify-center bg-black">
+                <div className="flex-1 p-4 flex flex-col items-center justify-center bg-black relative">
+                    {(focusedCamera || gridSite) && (
+                        <button
+                            onClick={() => {
+                                setFocusedCamera(null);
+                                setGridSite(null);
+                            }}
+                            className="absolute top-6 right-6 z-10 p-2 bg-black/50 rounded-full text-white hover:bg-black/80"
+                            title="Close View"
+                        >
+                            <X size={24} />
+                        </button>
+                    )}
+
                     {viewMode === 'focus' && focusedCamera && <CameraView key={focusedCamera.id} camera={focusedCamera} isFocused={true} />}
                     {viewMode === 'grid' && gridSite && (
                         <div className="w-full h-full">
@@ -278,13 +325,17 @@ function DispatcherDashboard() {
                             </div>
                         </div>
                     )}
+
                     {!focusedCamera && !gridSite && viewMode !== 'videoWall' && (
-                        <div className="text-center text-gray-500"><p>Select a camera or a site grid to view live feeds.</p></div>
+                        <div className="text-center text-gray-500">
+                            <h2 className="text-2xl text-gray-300 font-semibold">No Cameras in Live View</h2>
+                            <p className="mt-2">To view cameras, drag and drop or double click a site or a camera.</p>
+                        </div>
                     )}
                 </div>
                 
                 {isAlertLogVisible && (
-                    <div className="w-1/4 flex flex-col border-l border-gray-700 max-w-sm">
+                     <div className="w-1/4 flex flex-col border-l border-gray-700 max-w-sm">
                         <div className="p-4 border-b border-gray-700 bg-gray-800"><h2 className="text-lg font-semibold">Real-time Event Log</h2></div>
                         <div className="flex-1 overflow-y-auto p-2 space-y-2 bg-gray-900">
                             {alerts.map(alert => <AlertItem key={alert.id} alert={alert} onSelect={() => handleAlertSelect(alert)} isActive={activeAlert?.id === alert.id} />)}
@@ -298,6 +349,7 @@ function DispatcherDashboard() {
     );
 }
 
+// ... the CameraView, AlertItem, and AlertModal components remain unchanged ...
 // Component to display the video stream using WebRTC
 function CameraView({ camera, isFocused, siteName, isAlerting }) {
     const videoRef = useRef(null);
@@ -447,7 +499,6 @@ function CameraView({ camera, isFocused, siteName, isAlerting }) {
     );
 }
 
-// Sub-components for Alerts
 function AlertItem({ alert, onSelect, isActive }) {
     const statusInfo = { 'New': 'bg-red-500', 'Acknowledged': 'bg-yellow-500', 'Resolved': 'bg-gray-600' }[alert.status] || 'bg-gray-500';
     return (

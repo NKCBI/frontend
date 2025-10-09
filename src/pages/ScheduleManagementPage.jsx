@@ -95,7 +95,7 @@ function ScheduleManagementPage() {
             <h1 className="text-3xl font-bold">Monitoring Schedules</h1>
              <div className="bg-gray-800 p-6 rounded-lg shadow-lg">
                 <div className="flex justify-between items-center mb-4">
-                    <p className="text-gray-400 max-w-2xl">Create reusable schedules and then assign monitored cameras to them. Only cameras enabled in 'Device Management' will appear here.</p>
+                    <p className="text-gray-400 max-w-2xl">Create reusable schedules and assign cameras to them. Only cameras that are enabled for monitoring in 'Device Management' will appear in the assignment list.</p>
                     <button onClick={handleOpenCreateWizard} className="flex items-center px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 whitespace-nowrap">
                         <PlusCircle size={16} className="mr-2"/> Create New Schedule
                     </button>
@@ -358,10 +358,9 @@ function Step3_Assignments({ schedule, allAssignments, localAssignments, setLoca
     const allMonitoredCameras = monitoredDevices.flatMap(site => site.cameras.map(cam => ({...cam, siteName: site.name})));
 
     const assignedCameras = allMonitoredCameras.filter(cam => localAssignments[cam.id]);
-    const availableCameras = allMonitoredCameras.filter(cam => 
-        !localAssignments[cam.id] && 
-        (!allAssignments[cam.id] || allAssignments[cam.id] === schedule._id)
-    );
+    
+    // --- FIX: Simplified the filter to only check against the current schedule's assignments ---
+    const availableCameras = allMonitoredCameras.filter(cam => !localAssignments[cam.id]);
 
     const moveCamera = (cameraId, to) => {
         setLocalAssignments(prev => {
@@ -419,4 +418,3 @@ function Step3_Assignments({ schedule, allAssignments, localAssignments, setLoca
 }
 
 export default ScheduleManagementPage;
-
