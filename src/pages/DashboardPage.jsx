@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api';
-import { BellRing } from 'lucide-react';
+import { BellRing, CheckCheck } from 'lucide-react';
 
 function DashboardPage() {
     const [unconfiguredSites, setUnconfiguredSites] = useState([]);
@@ -21,6 +21,21 @@ function DashboardPage() {
 
         fetchDevices();
     }, []);
+
+    const handleResolveAllAlerts = async () => {
+        const confirmation = window.confirm(
+            "Are you sure you want to mark all unresolved alerts as 'Resolved'? This will clear the active queue for all dispatchers."
+        );
+        if (confirmation) {
+            try {
+                const response = await api.resolveAllActiveAlerts();
+                alert(response.data.message || "Active alerts resolved successfully.");
+            } catch (error) {
+                console.error("Failed to resolve active alerts:", error);
+                alert("An error occurred while resolving alerts.");
+            }
+        }
+    };
 
     if (isLoading) {
         return <div className="text-white">Loading dashboard...</div>;
@@ -59,9 +74,24 @@ function DashboardPage() {
                     <p className="text-gray-300 mt-2">All synchronized sites have been configured. The system is ready to monitor for events.</p>
                 </div>
             )}
+
+            <div className="bg-gray-800 p-6 rounded-lg shadow-lg">
+                <h2 className="text-xl font-semibold text-yellow-400">Administrative Actions</h2>
+                <div className="mt-4 border-t border-gray-700 pt-4">
+                    <p className="text-gray-400 mb-4">
+                        This action will mark all "New" or "Acknowledged" alerts as "Resolved". This is useful for clearing the active queue for all dispatchers after a testing period or system maintenance.
+                    </p>
+                    <button 
+                        onClick={handleResolveAllAlerts}
+                        className="flex items-center px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 whitespace-nowrap"
+                    >
+                        <CheckCheck size={16} className="mr-2"/> Mass Resolve All Unresolved Alerts
+                    </button>
+                </div>
+            </div>
+
         </div>
     );
 }
 
 export default DashboardPage;
-

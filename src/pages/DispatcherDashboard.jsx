@@ -45,7 +45,6 @@ function DispatcherDashboard() {
         monitoredDevicesRef.current = monitoredDevices;
     }, [monitoredDevices]);
 
-    // Function to play a simple alert sound
     const playAlertSound = () => {
         if (!audioContextRef.current) {
             try { audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)(); }
@@ -62,7 +61,6 @@ function DispatcherDashboard() {
         oscillator.stop(audioContextRef.current.currentTime + 0.5);
     };
     
-    // Adapts the alert format from the server for frontend use
     const adaptServerAlert = (serverAlert) => {
         const turingData = serverAlert.originalData;
         let snapshotUrl = `https://placehold.co/600x400/111827/9CA3AF?text=No+Snapshot`;
@@ -72,7 +70,6 @@ function DispatcherDashboard() {
         return { ...serverAlert, id: serverAlert._id, type: turingData.event_type?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'Unknown Event', cameraName: turingData.camera?.name || 'Unknown Camera', cameraId: turingData.camera?.id, snapshotUrl: snapshotUrl };
     };
 
-    // Helper to find a camera by its ID across all sites
     const findCameraById = (cameraId) => {
         for (const site of monitoredDevicesRef.current) {
             const camera = site.cameras.find(c => c.id === cameraId);
@@ -81,7 +78,6 @@ function DispatcherDashboard() {
         return { camera: null, site: null };
     };
 
-    // Handlers for changing the view mode
     const handleFocusCamera = (cameraToFocus, site) => {
         if (!cameraToFocus) return;
         setViewMode('focus');
@@ -111,7 +107,6 @@ function DispatcherDashboard() {
         if (camera && site) handleFocusCamera(camera, site);
     };
 
-    // Effect for handling the alert WebSocket connection
     useEffect(() => {
         const token = localStorage.getItem('authToken');
         const wsUrl = getWsUrl();
@@ -125,7 +120,7 @@ function DispatcherDashboard() {
             socket.onopen = () => {
                 console.log('[WebSocket] Connection established.');
                 setConnectionStatus('Connected');
-                reconnectAttemptRef.current = 0; // Reset counter on successful connection
+                reconnectAttemptRef.current = 0;
             };
 
             socket.onclose = () => {
@@ -187,7 +182,6 @@ function DispatcherDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    // Effect for fetching initial monitored devices and active alerts
     useEffect(() => {
         const fetchInitialData = async () => {
             try {
@@ -219,7 +213,6 @@ function DispatcherDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    // Functions to interact with the API for alerts
     const handleUpdateStatus = async (status) => {
         if (!activeAlert) return;
         try {
@@ -249,7 +242,6 @@ function DispatcherDashboard() {
         setOpenSites(prev => ({ ...prev, [siteId]: !prev[siteId] }));
     };
 
-    // Main JSX for the dashboard layout
     return (
         <div className="flex flex-col h-screen bg-gray-900 text-gray-200 font-sans">
             <header className="bg-gray-800 border-b border-gray-700 shadow-md">
@@ -374,7 +366,7 @@ function CameraView({ camera, isFocused, siteName, isAlerting }) {
     };
 
     useEffect(() => {
-        let pc; // RTCPeerConnection
+        let pc;
         let isMounted = true;
         const videoElement = videoRef.current;
         const pathName = `camera_${camera.id}`;
@@ -441,7 +433,7 @@ function CameraView({ camera, isFocused, siteName, isAlerting }) {
                             if (isMounted) {
                                 setRetryAttempt(prev => prev + 1);
                             }
-                        }, 5000); // Retry after 5 seconds
+                        }, 5000);
                     }
                 };
 
@@ -541,8 +533,12 @@ function AlertModal({ alert, onClose, onAcknowledge, onResolve, onAddNote }) {
                         <div className="flex-1 flex flex-col mt-4">
                             <h3 className="text-lg font-semibold mb-2">Dispatcher Notes</h3>
                             <div className="bg-gray-900/50 rounded-lg p-3 flex-1 overflow-y-auto space-y-3">
+                                {/* --- MODIFICATION: Display the username from the note object --- */}
                                 {(alert.notes || []).map((note, index) => (
-                                    <div key={index} className="text-sm"><p className="text-gray-300">{note.text}</p><p className="text-xs text-gray-500 text-right">- {note.username} at {new Date(note.timestamp).toLocaleTimeString()}</p></div>
+                                    <div key={index} className="text-sm border-b border-gray-700 pb-2 last:border-b-0">
+                                        <p className="text-gray-300">{note.text}</p>
+                                        <p className="text-xs text-gray-500 text-right">- {note.username} at {new Date(note.timestamp).toLocaleTimeString()}</p>
+                                    </div>
                                 ))}
                                 <div ref={notesEndRef} />
                             </div>
