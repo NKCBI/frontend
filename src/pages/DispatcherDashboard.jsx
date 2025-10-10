@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { api } from '../api.js';
 import { useAuth } from '../context/AuthContext.jsx';
-import { LogOut, ChevronDown, ChevronRight, Send, PanelLeftClose, PanelRightClose, Video, Grid3x3, LayoutGrid, Loader2, AlertTriangle, RefreshCw, X } from 'lucide-react';
+import { LogOut, ChevronDown, ChevronRight, PanelLeftClose, PanelRightClose, Video, Grid3x3, LayoutGrid, X } from 'lucide-react';
+import IncidentModal from './IncidentModal.jsx';
+import CameraView from '../components/CameraView.jsx';
 
 // --- Helper Functions & Constants ---
 const getWsUrl = () => {
@@ -11,16 +13,15 @@ const getWsUrl = () => {
     return `${protocol}//${url.host}`;
 };
 
-const delay = ms => new Promise(res => setTimeout(res, ms));
-
 // Main Dashboard Component
 function DispatcherDashboard() {
     const { user, logout } = useAuth();
     const [monitoredDevices, setMonitoredDevices] = useState([]);
     const [alerts, setAlerts] = useState([]);
     const [connectionStatus, setConnectionStatus] = useState('Connecting...');
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [activeAlert, setActiveAlert] = useState(null);
+    
+    const [viewingSiteId, setViewingSiteId] = useState(null);
+
     const [openSites, setOpenSites] = useState({});
     const [isSiteListVisible, setIsSiteListVisible] = useState(true);
     const [isAlertLogVisible, setIsAlertLogVisible] = useState(true);
@@ -35,6 +36,7 @@ function DispatcherDashboard() {
     const viewModeRef = useRef(viewMode);
     const reconnectTimeoutRef = useRef(null);
     const reconnectAttemptRef = useRef(0);
+    const modalCloseTimeoutRef = useRef(null);
     
     useEffect(() => {
         viewModeRef.current = viewMode;
@@ -101,8 +103,10 @@ function DispatcherDashboard() {
     };
 
     const handleAlertSelect = (alert) => {
-        setActiveAlert(alert);
-        setIsModalOpen(true);
+        if (modalCloseTimeoutRef.current) {
+            clearTimeout(modalCloseTimeoutRef.current);
+        }
+        setViewingSiteId(alert.siteProfile._id);
         const { camera, site } = findCameraById(alert.cameraId);
         if (camera && site) handleFocusCamera(camera, site);
     };
@@ -142,24 +146,33 @@ function DispatcherDashboard() {
 
             socket.onmessage = (event) => {
                 const message = JSON.parse(event.data);
-                const adaptedAlert = adaptServerAlert(message.alert);
                 
                 if (message.type === 'new_alert') {
+                    const adaptedAlert = adaptServerAlert(message.alert);
                     setAlerts(prev => prev.some(a => a.id === adaptedAlert.id) ? prev : [adaptedAlert, ...prev]);
-                    setActiveAlert(adaptedAlert);
-                    setIsModalOpen(true);
                     playAlertSound();
+
+                    if (!viewingSiteId) {
+                        setViewingSiteId(adaptedAlert.siteProfile._id);
+                    } else if (viewingSiteId === adaptedAlert.siteProfile._id) {
+                        if (modalCloseTimeoutRef.current) {
+                            clearTimeout(modalCloseTimeoutRef.current);
+                        }
+                    }
+                    
                     if (viewModeRef.current === 'videoWall') {
                         setAlertingCameraId(adaptedAlert.cameraId);
                         if (alertTimeoutRef.current) clearTimeout(alertTimeoutRef.current);
                         alertTimeoutRef.current = setTimeout(() => setAlertingCameraId(null), 10000);
                     } else {
-                        const { camera, site } = findCameraById(adaptedAlert.cameraId);
-                        if (camera && site) handleFocusCamera(camera, site);
+                        if (!viewingSiteId) {
+                             const { camera, site } = findCameraById(adaptedAlert.cameraId);
+                             if (camera && site) handleFocusCamera(camera, site);
+                        }
                     }
                 } else if (message.type === 'update_alert') {
+                    const adaptedAlert = adaptServerAlert(message.alert);
                     setAlerts(prev => prev.map(a => a.id === adaptedAlert.id ? adaptedAlert : a));
-                    setActiveAlert(current => current?.id === adaptedAlert.id ? adaptedAlert : current);
                 }
             };
         };
@@ -167,20 +180,16 @@ function DispatcherDashboard() {
         connect();
 
         return () => {
-            console.log("[WebSocket] Cleaning up WebSocket connection and timers.");
-            if (reconnectTimeoutRef.current) {
-                clearTimeout(reconnectTimeoutRef.current);
-            }
+            if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
             if (socketRef.current) {
                 socketRef.current.onclose = null; 
                 socketRef.current.close();
             }
-            if (alertTimeoutRef.current) {
-                clearTimeout(alertTimeoutRef.current);
-            }
+            if (alertTimeoutRef.current) clearTimeout(alertTimeoutRef.current);
+            if (modalCloseTimeoutRef.current) clearTimeout(modalCloseTimeoutRef.current);
         };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    }, [viewingSiteId]);
 
     useEffect(() => {
         const fetchInitialData = async () => {
@@ -190,57 +199,66 @@ function DispatcherDashboard() {
                     api.getActiveAlerts()
                 ]);
 
-                if (Array.isArray(devicesResponse.data)) {
-                    setMonitoredDevices(devicesResponse.data);
-                } else {
-                    console.error("API did not return an array for monitored devices:", devicesResponse.data);
-                    setMonitoredDevices([]);
-                }
+                if (Array.isArray(devicesResponse.data)) setMonitoredDevices(devicesResponse.data);
+                else setMonitoredDevices([]);
 
                 if (Array.isArray(activeAlertsResponse.data)) {
                     const adaptedAlerts = activeAlertsResponse.data.map(adaptServerAlert);
                     setAlerts(adaptedAlerts);
-                } else {
-                    console.error("API did not return an array for active alerts:", activeAlertsResponse.data);
                 }
-
             } catch (error) {
                 console.error("Failed to fetch initial data:", error);
                 setMonitoredDevices([]);
             }
         };
         fetchInitialData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    const handleUpdateStatus = async (status) => {
-        if (!activeAlert) return;
+    const handleUpdateStatus = async (alert, status) => {
+        if (!alert) return;
         try {
-            await api.updateAlertStatus(activeAlert.id, status);
-            if (status === 'Resolved') {
-                setIsModalOpen(false);
-                setActiveAlert(null);
-            }
+            await api.updateAlertStatus(alert.id, status);
         } catch (error) {
             console.error(`Failed to update alert status to ${status}:`, error);
         }
     };
 
-    const handleAddNote = async (noteText) => {
-        if (!activeAlert || !noteText.trim()) return;
+    const handleAddNote = async (alert, noteText) => {
+        if (!alert || !noteText.trim()) return;
         try {
-            const { data } = await api.addNoteToAlert(activeAlert.id, noteText);
-            const adaptedAlert = adaptServerAlert(data.alert);
-            setAlerts(prevAlerts => prevAlerts.map(a => a.id === adaptedAlert.id ? adaptedAlert : a));
-            setActiveAlert(adaptedAlert);
+            await api.addNoteToAlert(alert.id, noteText);
         } catch (error) {
             console.error("Failed to add note:", error);
         }
     };
+    
+    const alertsForViewingSite = viewingSiteId 
+        ? alerts.filter(a => a.siteProfile._id === viewingSiteId) 
+        : [];
+        
+    useEffect(() => {
+        if (viewingSiteId && alertsForViewingSite.length > 0) {
+            const allResolved = alertsForViewingSite.every(a => a.status === 'Resolved');
+            if (allResolved) {
+                modalCloseTimeoutRef.current = setTimeout(() => {
+                    setViewingSiteId(null);
+                }, 1500);
+            }
+        }
+        return () => {
+            if(modalCloseTimeoutRef.current) {
+                clearTimeout(modalCloseTimeoutRef.current);
+            }
+        }
+    }, [alertsForViewingSite, viewingSiteId]);
 
     const toggleSite = (siteId) => {
         setOpenSites(prev => ({ ...prev, [siteId]: !prev[siteId] }));
     };
+    
+    const viewingSiteName = alertsForViewingSite[0]?.siteProfile?.name || 'Incident';
+    
+    const recentAlerts = alerts.slice(0, 50);
 
     return (
         <div className="flex flex-col h-screen bg-gray-900 text-gray-200 font-sans">
@@ -332,8 +350,9 @@ function DispatcherDashboard() {
                     )}
                     {!focusedCamera && !gridSite && viewMode !== 'videoWall' && (
                         <div className="text-center text-gray-500">
-                            <h2 className="text-2xl text-gray-300 font-semibold">No Cameras in Live View</h2>
-                            <p className="mt-2">To view cameras, drag and drop or double click a site or a camera.</p>
+                             <Video size={48} className="mx-auto mb-4" />
+                            <h2 className="text-2xl text-gray-300 font-semibold">Live View</h2>
+                            <p className="mt-2">Select a camera or site to begin viewing.</p>
                         </div>
                     )}
                 </div>
@@ -342,239 +361,45 @@ function DispatcherDashboard() {
                     <div className="w-1/4 flex flex-col border-l border-gray-700 max-w-sm">
                         <div className="p-4 border-b border-gray-700 bg-gray-800"><h2 className="text-lg font-semibold">Real-time Event Log</h2></div>
                         <div className="flex-1 overflow-y-auto p-2 space-y-2 bg-gray-900">
-                            {alerts.map(alert => <AlertItem key={alert.id} alert={alert} onSelect={() => handleAlertSelect(alert)} isActive={activeAlert?.id === alert.id} />)}
+                            {recentAlerts.map(alert => <AlertItem key={alert.id} alert={alert} onSelect={() => handleAlertSelect(alert)} isActive={viewingSiteId === alert.siteProfile._id} />)}
                         </div>
                     </div>
                 )}
             </main>
             
-            {isModalOpen && activeAlert && <AlertModal alert={activeAlert} onClose={() => setIsModalOpen(false)} onAcknowledge={() => handleUpdateStatus('Acknowledged')} onResolve={() => handleUpdateStatus('Resolved')} onAddNote={handleAddNote}/>}
+            {viewingSiteId && alertsForViewingSite.length > 0 && (
+                <IncidentModal 
+                    siteName={viewingSiteName}
+                    alertsForSite={alertsForViewingSite}
+                    onClose={() => setViewingSiteId(null)} 
+                    onAcknowledge={(alert) => handleUpdateStatus(alert, 'Acknowledged')} 
+                    onResolve={(alert) => handleUpdateStatus(alert, 'Resolved')} 
+                    onAddNote={handleAddNote}
+                />
+            )}
         </div>
     );
 }
 
-// Component to display the video stream using WebRTC
-function CameraView({ camera, isFocused, siteName, isAlerting }) {
-    const videoRef = useRef(null);
-    const [isLoading, setIsLoading] = useState(true);
-    const [error, setError] = useState(null);
-    const [retryAttempt, setRetryAttempt] = useState(0);
-    const retryTimeoutRef = useRef(null);
-    
-    const restartStream = () => {
-        setRetryAttempt(prev => prev + 1);
-    };
-
-    useEffect(() => {
-        let pc;
-        let isMounted = true;
-        const videoElement = videoRef.current;
-        const pathName = `camera_${camera.id}`;
-
-        const cleanup = () => {
-            isMounted = false;
-            if (retryTimeoutRef.current) {
-                clearTimeout(retryTimeoutRef.current);
-            }
-            if (pc) {
-                pc.onconnectionstatechange = null;
-                pc.ontrack = null;
-                pc.close();
-            }
-            if (videoElement) {
-                videoElement.srcObject = null;
-            }
-        };
-
-        const startStream = async () => {
-            if (!videoElement) return;
-
-            cleanup();
-            isMounted = true;
-            setIsLoading(true);
-            setError(null);
-            
-            const startTime = performance.now();
-            console.log(`[${camera.name}] Attempting to start stream (Attempt: ${retryAttempt + 1})...`);
-            
-            try {
-                const rtspRes = await api.getRtspUrl(camera.id);
-                if (!isMounted || !rtspRes.data.ret.play_url) {
-                    throw new Error("RTSP URL not provided by API.");
-                }
-                const rtspUrl = rtspRes.data.ret.play_url;
-
-                await api.startMediaMTXStream(pathName, rtspUrl);
-
-                await delay(250);
-
-                pc = new RTCPeerConnection();
-
-                pc.ontrack = (event) => {
-                    if (videoElement.srcObject !== event.streams[0]) {
-                        videoElement.srcObject = event.streams[0];
-                    }
-                };
-                
-                pc.onconnectionstatechange = () => {
-                    if (!isMounted || !pc) return;
-                    console.log(`[${camera.name}] WebRTC Connection State: ${pc.connectionState}`);
-
-                    if (pc.connectionState === 'connected') {
-                        const endTime = performance.now();
-                        const loadTimeInSeconds = ((endTime - startTime) / 1000).toFixed(2);
-                        console.log(`[${camera.name}] WebRTC connection established in ${loadTimeInSeconds} seconds.`);
-                        setIsLoading(false);
-                    } else if (['disconnected', 'failed', 'closed'].includes(pc.connectionState)) {
-                        console.log(`[${camera.name}] Stream disconnected. Scheduling retry...`);
-                        setError('Stream interrupted. Retrying...');
-                        if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current);
-                        retryTimeoutRef.current = setTimeout(() => {
-                            if (isMounted) {
-                                setRetryAttempt(prev => prev + 1);
-                            }
-                        }, 5000);
-                    }
-                };
-
-                pc.addTransceiver('video', { 'direction': 'recvonly' });
-                pc.addTransceiver('audio', { 'direction': 'recvonly' });
-
-                const offer = await pc.createOffer();
-                await pc.setLocalDescription(offer);
-
-                const answerSdp = await api.startWhepsession(pathName, pc.localDescription.sdp);
-                
-                await pc.setRemoteDescription({
-                    type: 'answer',
-                    sdp: answerSdp,
-                });
-                
-            } catch (err) {
-                console.error(`[${camera.name}] Failed to start WebRTC stream:`, err);
-                if (isMounted) {
-                    const errorMessage = err.response?.data?.message || 'Could not load camera feed.';
-                    setError(errorMessage);
-                    setIsLoading(false);
-                }
-            }
-        };
-
-        startStream();
-
-        return cleanup;
-    }, [camera.id, retryAttempt]);
-
-    const borderClass = isAlerting ? 'ring-4 ring-red-500 animate-pulse' : 'ring-1 ring-gray-700';
-    const containerClasses = isFocused 
-        ? "w-full h-full bg-black flex flex-col items-center justify-center" 
-        : `w-full h-full bg-black rounded-lg flex flex-col items-center justify-center relative overflow-hidden ${borderClass}`;
-    
-    const videoClasses = "w-full h-full object-contain";
-    const cameraDisplayName = siteName ? `${siteName} - ${camera.name}` : camera.name;
-
-    return (
-        <div className={containerClasses}>
-            <div className={`w-full flex-1 relative ${isFocused ? 'h-full' : 'aspect-video'} flex items-center justify-center`}>
-                {isLoading && (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center text-white bg-black bg-opacity-50">
-                        <Loader2 className="animate-spin h-8 w-8 mb-2" />
-                        <span>Loading...</span>
-                    </div>
-                )}
-                {error && !isLoading && (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center text-white bg-black bg-opacity-50 p-2">
-                        <AlertTriangle className="h-8 w-8 text-red-500 mb-2" />
-                        <span className="text-center text-sm">{error}</span>
-                        <button onClick={restartStream} className="mt-4 px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded-md text-xs flex items-center">
-                            <RefreshCw size={12} className="mr-1" />
-                            Retry Now
-                        </button>
-                    </div>
-                )}
-                <video ref={videoRef} className={videoClasses} style={{ display: isLoading || error ? 'none' : 'block' }} autoPlay muted playsInline></video>
-                {!isFocused && (
-                    <div className="absolute bottom-0 left-0 w-full p-2 bg-black bg-opacity-50">
-                        <p className="text-white text-xs truncate">{cameraDisplayName}</p>
-                    </div>
-                )}
-            </div>
-             {isFocused && <h3 className="text-lg font-semibold mt-2 text-white">{cameraDisplayName}</h3>}
-        </div>
-    );
-}
-
-// Sub-components for Alerts
 function AlertItem({ alert, onSelect, isActive }) {
-    const statusInfo = { 'New': 'bg-red-500', 'Acknowledged': 'bg-yellow-500', 'Resolved': 'bg-gray-600' }[alert.status] || 'bg-gray-500';
+    const statusInfo = { 
+        'New': 'bg-red-500', 
+        'Acknowledged': 'bg-yellow-500',
+        'Resolved': 'bg-gray-600'
+    }[alert.status] || 'bg-gray-500';
+    
+    const itemClasses = alert.status === 'Resolved' 
+        ? 'opacity-50 hover:opacity-75' 
+        : 'hover:bg-gray-700/70';
+
     return (
-        <div onClick={onSelect} className={`flex items-center p-3 rounded-lg cursor-pointer hover:bg-gray-700/70 border-l-4 ${isActive ? 'bg-gray-700 border-blue-500' : 'border-transparent'}`}>
+        <div onClick={onSelect} className={`flex items-center p-3 rounded-lg cursor-pointer border-l-4 transition-all ${itemClasses} ${isActive && alert.status !== 'Resolved' ? 'bg-gray-700 border-blue-500' : 'border-transparent'}`}>
             <span className={`h-3 w-3 rounded-full ${statusInfo} mr-3 flex-shrink-0`}></span>
-            <div className="flex-1"><p className="font-semibold">{alert.type}</p><p className="text-sm text-gray-400">{alert.cameraName}</p></div>
-            <time className="text-xs text-gray-500">{new Date(alert.createdAt).toLocaleTimeString()}</time>
-        </div>
-    );
-}
-
-function AlertModal({ alert, onClose, onAcknowledge, onResolve, onAddNote }) {
-    const [noteText, setNoteText] = useState('');
-    const notesEndRef = useRef(null);
-    useEffect(() => { notesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [alert.notes]);
-    const handleAddNote = () => { onAddNote(noteText); setNoteText(''); };
-
-    return (
-        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
-            <div className="bg-gray-800 rounded-lg shadow-2xl w-full max-w-6xl h-[90vh] flex flex-col">
-                <div className="p-6 border-b border-gray-700"><div className="flex justify-between items-start"><h2 className="text-2xl font-bold text-white">{alert.type} Alert</h2><button onClick={onClose} className="text-gray-400 hover:text-white text-3xl">&times;</button></div></div>
-                <div className="flex-1 flex overflow-hidden">
-                    <div className="w-2/3 p-6 flex flex-col">
-                        <p className="text-sm text-gray-400">Event Snapshot</p>
-                        <img src={alert.snapshotUrl} alt="Event snapshot" className="mt-2 rounded-lg w-full aspect-video object-cover bg-black" />
-                        <div className="flex-1 flex flex-col mt-4">
-                            <h3 className="text-lg font-semibold mb-2">Dispatcher Notes</h3>
-                            <div className="bg-gray-900/50 rounded-lg p-3 flex-1 overflow-y-auto space-y-3">
-                                {/* --- MODIFICATION: Display the username from the note object --- */}
-                                {(alert.notes || []).map((note, index) => (
-                                    <div key={index} className="text-sm border-b border-gray-700 pb-2 last:border-b-0">
-                                        <p className="text-gray-300">{note.text}</p>
-                                        <p className="text-xs text-gray-500 text-right">- {note.username} at {new Date(note.timestamp).toLocaleTimeString()}</p>
-                                    </div>
-                                ))}
-                                <div ref={notesEndRef} />
-                            </div>
-                            <div className="mt-3 flex space-x-2">
-                                <textarea value={noteText} onChange={(e) => setNoteText(e.target.value)} placeholder="Add a new note..." rows="2" className="flex-1 bg-gray-700 border-gray-600 rounded-md text-white text-sm"></textarea>
-                                <button onClick={handleAddNote} className="px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 self-end"><Send size={16}/></button>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="w-1/3 p-6 border-l border-gray-700 flex flex-col space-y-4">
-                        <div>
-                            <p className="text-sm text-gray-400">Site Details</p>
-                            <div className="mt-2 p-4 bg-gray-700/50 rounded-lg">
-                                <ul className="space-y-2 text-gray-300">
-                                    <li><strong>Site:</strong> {alert.siteProfile.name}</li>
-                                    <li><strong>Account #:</strong> {alert.siteProfile.account_number || 'N/A'}</li>
-                                    <li><strong>District:</strong> {alert.siteProfile.district || 'N/A'}</li>
-                                    <li><strong>Camera:</strong> {alert.cameraName}</li>
-                                    <li><strong>Time:</strong> {new Date(alert.createdAt).toLocaleString()}</li>
-                                    <li><strong>Status:</strong> <span className="font-semibold">{alert.status}</span></li>
-                                </ul>
-                            </div>
-                        </div>
-                        <div>
-                            <p className="text-sm text-gray-400">Pertinent Information</p>
-                            <div className="mt-2 p-4 bg-gray-700/50 rounded-lg h-24 overflow-y-auto">
-                                <p className="text-sm text-gray-300">{alert.siteProfile.pertinent_info || 'No information provided.'}</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div className="bg-gray-700/50 px-6 py-4 flex justify-end space-x-4 rounded-b-lg">
-                    <button onClick={onAcknowledge} className="px-4 py-2 bg-yellow-500 text-white font-semibold rounded-lg hover:bg-yellow-600 disabled:bg-yellow-800" disabled={alert.status !== 'New'}>Acknowledge</button>
-                    <button onClick={onResolve} className="px-4 py-2 bg-green-500 text-white font-semibold rounded-lg hover:bg-green-600">Resolve</button>
-                </div>
+            <div className="flex-1">
+                <p className={`font-semibold ${alert.status === 'Resolved' ? 'text-gray-400' : 'text-white'}`}>{alert.type}</p>
+                <p className="text-sm text-gray-400">{alert.cameraName}</p>
             </div>
+            <time className="text-xs text-gray-500">{new Date(alert.createdAt).toLocaleTimeString()}</time>
         </div>
     );
 }
