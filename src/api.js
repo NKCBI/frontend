@@ -24,7 +24,8 @@ apiClient.interceptors.request.use(
 apiClient.interceptors.response.use(
     (response) => response,
     (error) => {
-        if (error.response && (error.response.status === 401 || error.response.status === 403)) {
+        // --- MODIFICATION: Check if the error is a 401/403 AND we are not already on the login page ---
+        if (error.response && (error.response.status === 401 || error.response.status === 403) && error.config.url !== '/auth/login') {
             localStorage.removeItem('authToken');
             window.location.href = '/login';
         }
@@ -49,7 +50,6 @@ export const api = {
         const baseWhepUrl = MEDIAMTX_WHEP_URL.replace(/\/$/, '');
         const finalWhepUrl = `${baseWhepUrl}/${pathName}/whep`;
         
-        // --- NEW LINE FOR PROOF ---
         console.log(`[WebRTC Proof] Attempting to connect to WHEP endpoint: ${finalWhepUrl}`);
         
         const response = await fetch(finalWhepUrl, {
@@ -78,8 +78,9 @@ export const api = {
     createDispatchGroup: (data) => apiClient.post('/dispatch-groups', data),
     updateDispatchGroup: (id, data) => apiClient.put(`/dispatch-groups/${id}`, data),
     deleteDispatchGroup: (id) => apiClient.delete(`/dispatch-groups/${id}`),
-    resolveAllActiveAlerts: () => apiClient.post('/alerts/resolve-all'),
-    getActiveAlerts: () => apiClient.get('/alerts/active'),
     getSystemSettings: () => apiClient.get('/settings'),
     updateSystemSettings: (data) => apiClient.put('/settings', data),
+    getActiveAlerts: () => apiClient.get('/alerts/active'),
+    resolveAllActiveAlerts: () => apiClient.post('/alerts/resolve-all'),
+    setPassword: (newPassword) => apiClient.post('/users/set-password', { newPassword }),
 };

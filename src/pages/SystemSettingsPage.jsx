@@ -2,9 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../api';
 import { Save, AlertTriangle, PlusCircle, Trash2 } from 'lucide-react';
 
+// Get a list of timezones supported by the browser
+const timezones = Intl.supportedValuesOf('timeZone');
+
 function SystemSettingsPage() {
-    // We now manage an array of tokens
-    const [settings, setSettings] = useState({ turingApiTokens: [''], webhookSecret: '' });
+    const [settings, setSettings] = useState({ turingApiTokens: [''], webhookSecret: '', timezone: '' });
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState('');
@@ -15,10 +17,10 @@ function SystemSettingsPage() {
             try {
                 setIsLoading(true);
                 const { data: currentSettings } = await api.getSystemSettings();
-                // Ensure turingApiTokens is always an array, even if it's missing or null
                 setSettings({
                     turingApiTokens: Array.isArray(currentSettings.turingApiTokens) && currentSettings.turingApiTokens.length > 0 ? currentSettings.turingApiTokens : [''],
-                    webhookSecret: currentSettings.webhookSecret || ''
+                    webhookSecret: currentSettings.webhookSecret || '',
+                    timezone: currentSettings.timezone || 'UTC', // Set timezone
                 });
             } catch (err) {
                 setError('Failed to load settings.');
@@ -42,7 +44,6 @@ function SystemSettingsPage() {
 
     const handleRemoveToken = (index) => {
         const newTokens = settings.turingApiTokens.filter((_, i) => i !== index);
-        // Ensure there's always at least one input field
         if (newTokens.length === 0) {
             setSettings({ ...settings, turingApiTokens: [''] });
         } else {
@@ -50,7 +51,7 @@ function SystemSettingsPage() {
         }
     };
     
-    const handleSecretChange = (e) => {
+    const handleChange = (e) => {
         setSettings({ ...settings, [e.target.name]: e.target.value });
     };
 
@@ -59,7 +60,6 @@ function SystemSettingsPage() {
         setError('');
         setSuccess('');
         try {
-            // Filter out any empty tokens before saving
             const settingsToSave = {
                 ...settings,
                 turingApiTokens: settings.turingApiTokens.filter(token => token.trim() !== '')
@@ -123,11 +123,27 @@ function SystemSettingsPage() {
                                 id="webhookSecret"
                                 name="webhookSecret"
                                 value={settings.webhookSecret || ''}
-                                onChange={handleSecretChange}
+                                onChange={handleChange}
                                 className="w-full bg-gray-700 border-gray-600 rounded-md text-white"
                                 placeholder="Paste your webhook secret here"
                             />
                             <p className="text-xs text-gray-500 mt-1">This secret is used to verify incoming webhook requests from Turing.</p>
+                        </div>
+
+                        <div>
+                            <label htmlFor="timezone" className="block text-sm font-medium text-gray-300 mb-1">System Timezone</label>
+                            <select
+                                id="timezone"
+                                name="timezone"
+                                value={settings.timezone}
+                                onChange={handleChange}
+                                className="w-full bg-gray-700 border-gray-600 rounded-md text-white"
+                            >
+                                {timezones.map(tz => (
+                                    <option key={tz} value={tz}>{tz}</option>
+                                ))}
+                            </select>
+                            <p className="text-xs text-gray-500 mt-1">This timezone will be used for all schedule calculations.</p>
                         </div>
                         
                         <div className="flex justify-end">

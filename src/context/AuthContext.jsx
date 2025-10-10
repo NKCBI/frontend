@@ -23,7 +23,8 @@ export const AuthProvider = ({ children }) => {
                 setUser({ 
                     username: decodedUser.username, 
                     role: decodedUser.role, 
-                    dispatchGroupId: decodedUser.dispatchGroupId 
+                    dispatchGroupId: decodedUser.dispatchGroupId,
+                    passwordChangeRequired: decodedUser.passwordChangeRequired
                 });
             }
         } catch (error) {
@@ -44,7 +45,9 @@ export const AuthProvider = ({ children }) => {
       setUser(userData);
       
       // Navigate to the correct dashboard based on role
-      if (userData.role === 'Administrator') {
+      if (userData.passwordChangeRequired) {
+        navigate('/force-password-change');
+      } else if (userData.role === 'Administrator') {
         navigate('/dashboard');
       } else if (userData.role === 'Dispatcher') {
         navigate('/dispatcher-dashboard');
@@ -78,4 +81,3 @@ export const AuthProvider = ({ children }) => {
 export const useAuth = () => {
   return useContext(AuthContext);
 };
-
