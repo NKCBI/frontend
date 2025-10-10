@@ -78,6 +78,7 @@ export const api = {
     createDispatchGroup: (data) => apiClient.post('/dispatch-groups', data),
     updateDispatchGroup: (id, data) => apiClient.put(`/dispatch-groups/${id}`, data),
     deleteDispatchGroup: (id) => apiClient.delete(`/dispatch-groups/${id}`),
+    getActiveAlerts: () => apiClient.get('/alerts/active'),
     getSystemSettings: () => apiClient.get('/settings'),
     updateSystemSettings: (data) => apiClient.put('/settings', data),
 };

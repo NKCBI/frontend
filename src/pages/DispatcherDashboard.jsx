@@ -11,6 +11,8 @@ const getWsUrl = () => {
     return `${protocol}//${url.host}`;
 };
 
+const delay = ms => new Promise(res => setTimeout(res, ms));
+
 // Main Dashboard Component
 function DispatcherDashboard() {
     const { user, logout } = useAuth();
@@ -31,8 +33,6 @@ function DispatcherDashboard() {
     const socketRef = useRef(null);
     const alertTimeoutRef = useRef(null);
     const viewModeRef = useRef(viewMode);
-    
-    // --- CHANGE 1: Add refs to manage reconnection state ---
     const reconnectTimeoutRef = useRef(null);
     const reconnectAttemptRef = useRef(0);
     
@@ -45,7 +45,7 @@ function DispatcherDashboard() {
         monitoredDevicesRef.current = monitoredDevices;
     }, [monitoredDevices]);
 
-    // ... existing helper functions ...
+    // Function to play a simple alert sound
     const playAlertSound = () => {
         if (!audioContextRef.current) {
             try { audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)(); }
@@ -62,6 +62,7 @@ function DispatcherDashboard() {
         oscillator.stop(audioContextRef.current.currentTime + 0.5);
     };
     
+    // Adapts the alert format from the server for frontend use
     const adaptServerAlert = (serverAlert) => {
         const turingData = serverAlert.originalData;
         let snapshotUrl = `https://placehold.co/600x400/111827/9CA3AF?text=No+Snapshot`;
@@ -71,6 +72,7 @@ function DispatcherDashboard() {
         return { ...serverAlert, id: serverAlert._id, type: turingData.event_type?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'Unknown Event', cameraName: turingData.camera?.name || 'Unknown Camera', cameraId: turingData.camera?.id, snapshotUrl: snapshotUrl };
     };
 
+    // Helper to find a camera by its ID across all sites
     const findCameraById = (cameraId) => {
         for (const site of monitoredDevicesRef.current) {
             const camera = site.cameras.find(c => c.id === cameraId);
@@ -79,6 +81,7 @@ function DispatcherDashboard() {
         return { camera: null, site: null };
     };
 
+    // Handlers for changing the view mode
     const handleFocusCamera = (cameraToFocus, site) => {
         if (!cameraToFocus) return;
         setViewMode('focus');
@@ -108,7 +111,7 @@ function DispatcherDashboard() {
         if (camera && site) handleFocusCamera(camera, site);
     };
 
-    // --- CHANGE 2: The WebSocket connection logic is now wrapped in its own function and handles reconnection ---
+    // Effect for handling the alert WebSocket connection
     useEffect(() => {
         const token = localStorage.getItem('authToken');
         const wsUrl = getWsUrl();
@@ -129,8 +132,7 @@ function DispatcherDashboard() {
                 console.warn('[WebSocket] Connection closed.');
                 setConnectionStatus('Disconnected');
                 
-                // Exponential backoff reconnection logic
-                const delay = Math.min(30000, (2 ** reconnectAttemptRef.current) * 2000); // 2s, 4s, 8s, up to 30s
+                const delay = Math.min(30000, (2 ** reconnectAttemptRef.current) * 2000);
                 console.log(`[WebSocket] Will attempt to reconnect in ${delay / 1000} seconds.`);
                 
                 reconnectAttemptRef.current++;
@@ -140,7 +142,6 @@ function DispatcherDashboard() {
             socket.onerror = (error) => {
                 console.error('[WebSocket] Error:', error);
                 setConnectionStatus('Error');
-                // The onclose event will fire immediately after onerror, so the reconnection logic will be triggered there.
                 socket.close();
             };
 
@@ -168,16 +169,14 @@ function DispatcherDashboard() {
             };
         };
 
-        connect(); // Initial connection attempt
+        connect();
 
         return () => {
-            // --- CHANGE 3: Enhanced cleanup ---
             console.log("[WebSocket] Cleaning up WebSocket connection and timers.");
             if (reconnectTimeoutRef.current) {
                 clearTimeout(reconnectTimeoutRef.current);
             }
             if (socketRef.current) {
-                // Remove event listeners to prevent reconnection attempts after unmount
                 socketRef.current.onclose = null; 
                 socketRef.current.close();
             }
@@ -188,25 +187,39 @@ function DispatcherDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    // ... other existing useEffects and handlers ...
+    // Effect for fetching initial monitored devices and active alerts
     useEffect(() => {
         const fetchInitialData = async () => {
             try {
-                const response = await api.getMonitoredDevices();
-                if (Array.isArray(response.data)) {
-                    setMonitoredDevices(response.data);
+                const [devicesResponse, activeAlertsResponse] = await Promise.all([
+                    api.getMonitoredDevices(),
+                    api.getActiveAlerts()
+                ]);
+
+                if (Array.isArray(devicesResponse.data)) {
+                    setMonitoredDevices(devicesResponse.data);
                 } else {
-                    console.error("API did not return an array for monitored devices:", response.data);
+                    console.error("API did not return an array for monitored devices:", devicesResponse.data);
                     setMonitoredDevices([]);
                 }
+
+                if (Array.isArray(activeAlertsResponse.data)) {
+                    const adaptedAlerts = activeAlertsResponse.data.map(adaptServerAlert);
+                    setAlerts(adaptedAlerts);
+                } else {
+                    console.error("API did not return an array for active alerts:", activeAlertsResponse.data);
+                }
+
             } catch (error) {
                 console.error("Failed to fetch initial data:", error);
                 setMonitoredDevices([]);
             }
         };
         fetchInitialData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
+    // Functions to interact with the API for alerts
     const handleUpdateStatus = async (status) => {
         if (!activeAlert) return;
         try {
@@ -236,9 +249,9 @@ function DispatcherDashboard() {
         setOpenSites(prev => ({ ...prev, [siteId]: !prev[siteId] }));
     };
 
+    // Main JSX for the dashboard layout
     return (
         <div className="flex flex-col h-screen bg-gray-900 text-gray-200 font-sans">
-            {/* ... The rest of the JSX remains the same ... */}
             <header className="bg-gray-800 border-b border-gray-700 shadow-md">
                  <div className="mx-auto max-w-full px-4 sm:px-6 lg:px-8">
                     <div className="flex h-16 items-center justify-between">
@@ -325,7 +338,6 @@ function DispatcherDashboard() {
                             </div>
                         </div>
                     )}
-
                     {!focusedCamera && !gridSite && viewMode !== 'videoWall' && (
                         <div className="text-center text-gray-500">
                             <h2 className="text-2xl text-gray-300 font-semibold">No Cameras in Live View</h2>
@@ -335,7 +347,7 @@ function DispatcherDashboard() {
                 </div>
                 
                 {isAlertLogVisible && (
-                     <div className="w-1/4 flex flex-col border-l border-gray-700 max-w-sm">
+                    <div className="w-1/4 flex flex-col border-l border-gray-700 max-w-sm">
                         <div className="p-4 border-b border-gray-700 bg-gray-800"><h2 className="text-lg font-semibold">Real-time Event Log</h2></div>
                         <div className="flex-1 overflow-y-auto p-2 space-y-2 bg-gray-900">
                             {alerts.map(alert => <AlertItem key={alert.id} alert={alert} onSelect={() => handleAlertSelect(alert)} isActive={activeAlert?.id === alert.id} />)}
@@ -349,7 +361,6 @@ function DispatcherDashboard() {
     );
 }
 
-// ... the CameraView, AlertItem, and AlertModal components remain unchanged ...
 // Component to display the video stream using WebRTC
 function CameraView({ camera, isFocused, siteName, isAlerting }) {
     const videoRef = useRef(null);
@@ -402,6 +413,8 @@ function CameraView({ camera, isFocused, siteName, isAlerting }) {
                 const rtspUrl = rtspRes.data.ret.play_url;
 
                 await api.startMediaMTXStream(pathName, rtspUrl);
+
+                await delay(250);
 
                 pc = new RTCPeerConnection();
 
@@ -499,6 +512,7 @@ function CameraView({ camera, isFocused, siteName, isAlerting }) {
     );
 }
 
+// Sub-components for Alerts
 function AlertItem({ alert, onSelect, isActive }) {
     const statusInfo = { 'New': 'bg-red-500', 'Acknowledged': 'bg-yellow-500', 'Resolved': 'bg-gray-600' }[alert.status] || 'bg-gray-500';
     return (
