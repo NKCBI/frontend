@@ -1,11 +1,14 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
-import { Building, CalendarClock, BellRing, Users, Settings, FolderKanban, LogOut, LayoutDashboard } from 'lucide-react';
+import { 
+    Building, CalendarClock, Users, Settings, FolderKanban, 
+    LogOut, LayoutDashboard, RadioTower, ChevronsLeft, ChevronsRight, KeyRound // Import KeyRound icon
+} from 'lucide-react';
 
 const navItems = [
     { to: "/dashboard", icon: <LayoutDashboard size={20} />, label: "Dashboard" },
-    // MODIFIED: The label is updated and the old "Site Profiles" link is removed.
+    { to: "/dispatcher-dashboard", icon: <RadioTower size={20} />, label: "Live Dispatch" },
     { to: "/devices", icon: <Building size={20} />, label: "Device & Site Mgmt" },
     { to: "/schedules", icon: <CalendarClock size={20} />, label: "Schedules" },
     { to: "/dispatch-groups", icon: <Users size={20} />, label: "Dispatch Groups" },
@@ -15,11 +18,14 @@ const navItems = [
 const adminNavItems = [
     { to: "/users", icon: <Users size={20} />, label: "User Management" },
     { to: "/settings", icon: <Settings size={20} />, label: "System Settings" },
-]
+    // --- NEW NAVIGATION ITEM ---
+    { to: "/change-password", icon: <KeyRound size={20} />, label: "Change Password" },
+];
 
 function AdminLayout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const [isSidebarVisible, setIsSidebarVisible] = useState(true);
 
   const handleLogout = () => {
     logout();
@@ -28,12 +34,16 @@ function AdminLayout() {
 
   return (
     <div className="bg-gray-900 text-gray-200 font-sans min-h-screen flex">
-      <aside className="w-64 bg-gray-800 p-4 border-r border-gray-700 flex flex-col">
-        <div className="px-2 mb-8">
+      
+      <aside 
+        className={`w-64 bg-gray-800 p-4 border-r border-gray-700 flex flex-col fixed top-0 left-0 h-full z-40 transition-transform duration-300 ease-in-out ${isSidebarVisible ? 'translate-x-0' : '-translate-x-full'}`}
+      >
+        <div className="p-4">
             <h1 className="text-2xl font-bold text-white">Admin Panel</h1>
             <p className="text-xs text-gray-400">Welcome, {user?.username}</p>
         </div>
-        <nav className="space-y-2 flex-1">
+        
+        <nav className="flex-1 space-y-2 overflow-y-auto px-4">
             {navItems.map(item => (
                 <NavLink
                     key={item.to}
@@ -47,7 +57,8 @@ function AdminLayout() {
                 </NavLink>
             ))}
         </nav>
-        <div className="border-t border-gray-700 pt-2">
+        
+        <div className="p-4 border-t border-gray-700">
              {adminNavItems.map(item => (
                 <NavLink
                     key={item.to}
@@ -67,9 +78,19 @@ function AdminLayout() {
         </div>
       </aside>
 
-      <main className="flex-1 p-8 overflow-y-auto">
+      <button
+        onClick={() => setIsSidebarVisible(!isSidebarVisible)}
+        className="fixed top-1/2 -translate-y-1/2 z-50 p-2 bg-gray-800 rounded-r-lg text-gray-300 hover:bg-gray-700 hover:text-white transition-all duration-300 ease-in-out"
+        style={{ left: isSidebarVisible ? '16rem' : '0' }}
+        title={isSidebarVisible ? "Collapse Sidebar" : "Expand Sidebar"}
+      >
+        {isSidebarVisible ? <ChevronsLeft size={20} /> : <ChevronsRight size={20} />}
+      </button>
+
+      <main className={`flex-1 p-8 overflow-y-auto transition-all duration-300 ease-in-out ${isSidebarVisible ? 'ml-64' : 'ml-0'}`}>
         <Outlet />
       </main>
+
     </div>
   );
 }

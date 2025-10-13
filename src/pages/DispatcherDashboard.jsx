@@ -12,16 +12,17 @@ const getWsUrl = () => {
     const protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
     return `${protocol}//${url.host}`;
 };
+const SESSION_KEY = 'vms_dispatch_session';
+const SESSION_TIMEOUT = 15 * 60 * 1000; // 15 minutes
 
 // Main Dashboard Component
 function DispatcherDashboard() {
-    const { user, logout } = useAuth();
-    const [monitoredDevices, setMonitoredDevices] = useState([]);
-    const [alerts, setAlerts] = useState([]);
-    const [connectionStatus, setConnectionStatus] = useState('Connecting...');
+    // --- STATE REFACTOR: Use global state from AuthContext ---
+    const { user, logout, alerts, setAlerts } = useAuth();
     
+    const [monitoredDevices, setMonitoredDevices] = useState([]);
+    const [connectionStatus, setConnectionStatus] = useState('Connecting...');
     const [viewingSiteId, setViewingSiteId] = useState(null);
-
     const [openSites, setOpenSites] = useState({});
     const [isSiteListVisible, setIsSiteListVisible] = useState(true);
     const [isAlertLogVisible, setIsAlertLogVisible] = useState(true);
@@ -52,15 +53,29 @@ function DispatcherDashboard() {
             try { audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)(); }
             catch (e) { console.error("AudioContext not supported.", e); return; }
         }
-        const oscillator = audioContextRef.current.createOscillator();
-        const gainNode = audioContextRef.current.createGain();
-        oscillator.connect(gainNode);
-        gainNode.connect(audioContextRef.current.destination);
-        oscillator.type = 'sine';
-        oscillator.frequency.setValueAtTime(660, audioContextRef.current.currentTime);
-        gainNode.gain.setValueAtTime(0.5, audioContextRef.current.currentTime);
-        oscillator.start(audioContextRef.current.currentTime);
-        oscillator.stop(audioContextRef.current.currentTime + 0.5);
+        const audioCtx = audioContextRef.current;
+        const now = audioCtx.currentTime;
+        const duration = 0.6;
+        const masterGain = audioCtx.createGain();
+        masterGain.connect(audioCtx.destination);
+        masterGain.gain.setValueAtTime(0.3, now);
+        const osc1 = audioCtx.createOscillator();
+        const osc2 = audioCtx.createOscillator();
+        osc1.type = 'sawtooth';
+        osc2.type = 'sawtooth';
+        const highFreq = 900;
+        const lowFreq = 600;
+        osc1.frequency.setValueAtTime(highFreq, now);
+        osc2.frequency.setValueAtTime(highFreq + 10, now);
+        osc1.frequency.exponentialRampToValueAtTime(lowFreq, now + duration * 0.8);
+        osc2.frequency.exponentialRampToValueAtTime(lowFreq + 10, now + duration * 0.8);
+        masterGain.gain.exponentialRampToValueAtTime(0.01, now + duration);
+        osc1.connect(masterGain);
+        osc2.connect(masterGain);
+        osc1.start(now);
+        osc2.start(now);
+        osc1.stop(now + duration);
+        osc2.stop(now + duration);
     };
     
     const adaptServerAlert = (serverAlert) => {
@@ -103,9 +118,7 @@ function DispatcherDashboard() {
     };
 
     const handleAlertSelect = (alert) => {
-        if (modalCloseTimeoutRef.current) {
-            clearTimeout(modalCloseTimeoutRef.current);
-        }
+        if (modalCloseTimeoutRef.current) clearTimeout(modalCloseTimeoutRef.current);
         setViewingSiteId(alert.siteProfile._id);
         const { camera, site } = findCameraById(alert.cameraId);
         if (camera && site) handleFocusCamera(camera, site);
@@ -116,7 +129,7 @@ function DispatcherDashboard() {
         const wsUrl = getWsUrl();
 
         const connect = () => {
-            console.log(`[WebSocket] Attempting to connect... (Attempt: ${reconnectAttemptRef.current + 1})`);
+            console.log(`[WebSocket] Attempting to connect...`);
             setConnectionStatus('Connecting...');
             const socket = new WebSocket(`${wsUrl}?token=${token}`);
             socketRef.current = socket;
@@ -130,10 +143,7 @@ function DispatcherDashboard() {
             socket.onclose = () => {
                 console.warn('[WebSocket] Connection closed.');
                 setConnectionStatus('Disconnected');
-                
                 const delay = Math.min(30000, (2 ** reconnectAttemptRef.current) * 2000);
-                console.log(`[WebSocket] Will attempt to reconnect in ${delay / 1000} seconds.`);
-                
                 reconnectAttemptRef.current++;
                 reconnectTimeoutRef.current = setTimeout(connect, delay);
             };
@@ -146,29 +156,19 @@ function DispatcherDashboard() {
 
             socket.onmessage = (event) => {
                 const message = JSON.parse(event.data);
-                
                 if (message.type === 'new_alert') {
                     const adaptedAlert = adaptServerAlert(message.alert);
                     setAlerts(prev => prev.some(a => a.id === adaptedAlert.id) ? prev : [adaptedAlert, ...prev]);
                     playAlertSound();
-
-                    if (!viewingSiteId) {
-                        setViewingSiteId(adaptedAlert.siteProfile._id);
-                    } else if (viewingSiteId === adaptedAlert.siteProfile._id) {
-                        if (modalCloseTimeoutRef.current) {
-                            clearTimeout(modalCloseTimeoutRef.current);
-                        }
-                    }
-                    
+                    if (!viewingSiteId) setViewingSiteId(adaptedAlert.siteProfile._id);
+                    else if (viewingSiteId === adaptedAlert.siteProfile._id && modalCloseTimeoutRef.current) clearTimeout(modalCloseTimeoutRef.current);
                     if (viewModeRef.current === 'videoWall') {
                         setAlertingCameraId(adaptedAlert.cameraId);
                         if (alertTimeoutRef.current) clearTimeout(alertTimeoutRef.current);
                         alertTimeoutRef.current = setTimeout(() => setAlertingCameraId(null), 10000);
-                    } else {
-                        if (!viewingSiteId) {
-                             const { camera, site } = findCameraById(adaptedAlert.cameraId);
-                             if (camera && site) handleFocusCamera(camera, site);
-                        }
+                    } else if (!viewingSiteId) {
+                        const { camera, site } = findCameraById(adaptedAlert.cameraId);
+                        if (camera && site) handleFocusCamera(camera, site);
                     }
                 } else if (message.type === 'update_alert') {
                     const adaptedAlert = adaptServerAlert(message.alert);
@@ -178,7 +178,6 @@ function DispatcherDashboard() {
         };
 
         connect();
-
         return () => {
             if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
             if (socketRef.current) {
@@ -189,30 +188,45 @@ function DispatcherDashboard() {
             if (modalCloseTimeoutRef.current) clearTimeout(modalCloseTimeoutRef.current);
         };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [viewingSiteId]);
+    }, [viewingSiteId, setAlerts]); // Use setAlerts from context
 
+    // --- SESSION RESTORE LOGIC ---
     useEffect(() => {
         const fetchInitialData = async () => {
             try {
-                const [devicesResponse, activeAlertsResponse] = await Promise.all([
-                    api.getMonitoredDevices(),
-                    api.getActiveAlerts()
-                ]);
+                // First, fetch the device list, which is always needed.
+                const { data: devicesData } = await api.getMonitoredDevices();
+                if(Array.isArray(devicesData)) setMonitoredDevices(devicesData);
 
-                if (Array.isArray(devicesResponse.data)) setMonitoredDevices(devicesResponse.data);
-                else setMonitoredDevices([]);
-
-                if (Array.isArray(activeAlertsResponse.data)) {
-                    const adaptedAlerts = activeAlertsResponse.data.map(adaptServerAlert);
-                    setAlerts(adaptedAlerts);
+                // Then, check for a saved session.
+                const savedSessionJSON = localStorage.getItem(SESSION_KEY);
+                if (savedSessionJSON) {
+                    const savedSession = JSON.parse(savedSessionJSON);
+                    const isSessionValid = user && savedSession.username === user.username && (Date.now() - savedSession.timestamp < SESSION_TIMEOUT);
+                    
+                    if (isSessionValid) {
+                        console.log("Restoring previous session state.");
+                        setAlerts(savedSession.alerts);
+                        localStorage.removeItem(SESSION_KEY); // Clear after restoring
+                        return; // Stop here, don't fetch from API
+                    }
                 }
+                
+                // If no valid session, fetch fresh data from the API.
+                console.log("No valid session found. Fetching fresh alert data.");
+                const { data: activeAlertsData } = await api.getActiveAlerts();
+                if (Array.isArray(activeAlertsData)) {
+                    setAlerts(activeAlertsData.map(adaptServerAlert));
+                }
+
             } catch (error) {
                 console.error("Failed to fetch initial data:", error);
                 setMonitoredDevices([]);
             }
         };
         fetchInitialData();
-    }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [user, setAlerts]); // Dependency on user and setAlerts from context
 
     const handleUpdateStatus = async (alert, status) => {
         if (!alert) return;
@@ -232,32 +246,34 @@ function DispatcherDashboard() {
         }
     };
     
-    const alertsForViewingSite = viewingSiteId 
-        ? alerts.filter(a => a.siteProfile._id === viewingSiteId) 
-        : [];
+    const alertsForViewingSite = viewingSiteId ? alerts.filter(a => a.siteProfile._id === viewingSiteId) : [];
         
     useEffect(() => {
         if (viewingSiteId && alertsForViewingSite.length > 0) {
             const allResolved = alertsForViewingSite.every(a => a.status === 'Resolved');
             if (allResolved) {
-                modalCloseTimeoutRef.current = setTimeout(() => {
-                    setViewingSiteId(null);
-                }, 1500);
+                modalCloseTimeoutRef.current = setTimeout(() => setViewingSiteId(null), 1500);
             }
         }
-        return () => {
-            if(modalCloseTimeoutRef.current) {
-                clearTimeout(modalCloseTimeoutRef.current);
-            }
-        }
+        return () => { if (modalCloseTimeoutRef.current) clearTimeout(modalCloseTimeoutRef.current); }
     }, [alertsForViewingSite, viewingSiteId]);
 
-    const toggleSite = (siteId) => {
-        setOpenSites(prev => ({ ...prev, [siteId]: !prev[siteId] }));
+    const handleAcknowledgeAll = async () => {
+        const alertsToAck = alertsForViewingSite.filter(a => a.status === 'New');
+        const promises = alertsToAck.map(alert => api.updateAlertStatus(alert.id, 'Acknowledged'));
+        try { await Promise.all(promises); } 
+        catch (error) { console.error("Failed to acknowledge all alerts:", error); }
     };
-    
+
+    const handleResolveIncident = async () => {
+        const alertsToResolve = alertsForViewingSite.filter(a => a.status !== 'Resolved');
+        const promises = alertsToResolve.map(alert => api.updateAlertStatus(alert.id, 'Resolved'));
+        try { await Promise.all(promises); } 
+        catch (error) { console.error("Failed to resolve incident:", error); }
+    };
+
+    const toggleSite = (siteId) => setOpenSites(prev => ({ ...prev, [siteId]: !prev[siteId] }));
     const viewingSiteName = alertsForViewingSite[0]?.siteProfile?.name || 'Incident';
-    
     const recentAlerts = alerts.slice(0, 50);
 
     return (
@@ -314,19 +330,7 @@ function DispatcherDashboard() {
                 )}
                 
                 <div className="flex-1 p-4 flex flex-col items-center justify-center bg-black relative">
-                    {(focusedCamera || gridSite) && (
-                        <button
-                            onClick={() => {
-                                setFocusedCamera(null);
-                                setGridSite(null);
-                            }}
-                            className="absolute top-6 right-6 z-10 p-2 bg-black/50 rounded-full text-white hover:bg-black/80"
-                            title="Close View"
-                        >
-                            <X size={24} />
-                        </button>
-                    )}
-
+                    {(focusedCamera || gridSite) && (<button onClick={() => { setFocusedCamera(null); setGridSite(null); }} className="absolute top-6 right-6 z-10 p-2 bg-black/50 rounded-full text-white hover:bg-black/80" title="Close View"><X size={24} /></button>)}
                     {viewMode === 'focus' && focusedCamera && <CameraView key={focusedCamera.id} camera={focusedCamera} isFocused={true} />}
                     {viewMode === 'grid' && gridSite && (
                         <div className="w-full h-full">
@@ -340,11 +344,7 @@ function DispatcherDashboard() {
                         <div className="w-full h-full flex flex-col">
                              <h2 className="text-xl font-semibold text-white mb-4 text-center">Global Video Wall</h2>
                              <div className={`w-full flex-1 grid gap-2 grid-cols-4`}>
-                                {monitoredDevices.flatMap(site =>
-                                    site.cameras.map(cam => (
-                                        <CameraView key={cam.id} camera={cam} siteName={site.name} isFocused={false} isAlerting={cam.id === alertingCameraId} />
-                                    ))
-                                )}
+                                {monitoredDevices.flatMap(site => site.cameras.map(cam => (<CameraView key={cam.id} camera={cam} siteName={site.name} isFocused={false} isAlerting={cam.id === alertingCameraId} />)))}
                             </div>
                         </div>
                     )}
@@ -371,10 +371,13 @@ function DispatcherDashboard() {
                 <IncidentModal 
                     siteName={viewingSiteName}
                     alertsForSite={alertsForViewingSite}
+                    currentUser={user}
                     onClose={() => setViewingSiteId(null)} 
                     onAcknowledge={(alert) => handleUpdateStatus(alert, 'Acknowledged')} 
                     onResolve={(alert) => handleUpdateStatus(alert, 'Resolved')} 
                     onAddNote={handleAddNote}
+                    onAcknowledgeAll={handleAcknowledgeAll}
+                    onResolveAll={handleResolveIncident}
                 />
             )}
         </div>
@@ -382,16 +385,8 @@ function DispatcherDashboard() {
 }
 
 function AlertItem({ alert, onSelect, isActive }) {
-    const statusInfo = { 
-        'New': 'bg-red-500', 
-        'Acknowledged': 'bg-yellow-500',
-        'Resolved': 'bg-gray-600'
-    }[alert.status] || 'bg-gray-500';
-    
-    const itemClasses = alert.status === 'Resolved' 
-        ? 'opacity-50 hover:opacity-75' 
-        : 'hover:bg-gray-700/70';
-
+    const statusInfo = { 'New': 'bg-red-500', 'Acknowledged': 'bg-yellow-500', 'Resolved': 'bg-gray-600' }[alert.status] || 'bg-gray-500';
+    const itemClasses = alert.status === 'Resolved' ? 'opacity-50 hover:opacity-75' : 'hover:bg-gray-700/70';
     return (
         <div onClick={onSelect} className={`flex items-center p-3 rounded-lg cursor-pointer border-l-4 transition-all ${itemClasses} ${isActive && alert.status !== 'Resolved' ? 'bg-gray-700 border-blue-500' : 'border-transparent'}`}>
             <span className={`h-3 w-3 rounded-full ${statusInfo} mr-3 flex-shrink-0`}></span>

@@ -34,6 +34,9 @@ apiClient.interceptors.response.use(
 
 export const api = {
     login: (username, password) => apiClient.post('/auth/login', { username, password }),
+    // --- NEW FUNCTION ---
+    changePassword: (currentPassword, newPassword) => apiClient.post('/auth/change-password', { currentPassword, newPassword }),
+    
     getDevices: () => apiClient.get('/devices'),
     getMonitoredDevices: () => apiClient.get('/monitored-devices'),
     updateCameraMonitorStatus: (id, isMonitored) => apiClient.put(`/cameras/${id}/monitor`, { isMonitored }),
@@ -41,7 +44,6 @@ export const api = {
     updateSiteProfile: (id, data) => apiClient.put(`/devices/${id}/profile`, data),
     
     putCameraToSleep: (cameraId, hours) => apiClient.post(`/cameras/${cameraId}/sleep`, { hours }),
-    // --- NEW FUNCTION ---
     wakeUpCamera: (cameraId) => apiClient.post(`/cameras/${cameraId}/wakeup`),
 
     getHistoricalAlerts: (filters) => apiClient.get('/alerts/history', { params: filters }),
