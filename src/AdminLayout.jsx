@@ -5,8 +5,8 @@ import { Building, CalendarClock, BellRing, Users, Settings, FolderKanban, LogOu
 
 const navItems = [
     { to: "/dashboard", icon: <LayoutDashboard size={20} />, label: "Dashboard" },
-    { to: "/devices", icon: <BellRing size={20} />, label: "Device Management" },
-    { to: "/sites", icon: <Building size={20} />, label: "Site Profiles" },
+    // MODIFIED: The label is updated and the old "Site Profiles" link is removed.
+    { to: "/devices", icon: <Building size={20} />, label: "Device & Site Mgmt" },
     { to: "/schedules", icon: <CalendarClock size={20} />, label: "Schedules" },
     { to: "/dispatch-groups", icon: <Users size={20} />, label: "Dispatch Groups" },
     { to: "/history", icon: <FolderKanban size={20} />, label: "Event History" },
@@ -74,5 +74,4 @@ function AdminLayout() {
   );
 }
 
-export default AdminLayout; // <-- THIS LINE FIXES THE ERROR
-
+export default AdminLayout;

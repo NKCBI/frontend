@@ -24,8 +24,7 @@ apiClient.interceptors.request.use(
 apiClient.interceptors.response.use(
     (response) => response,
     (error) => {
-        // --- MODIFICATION: Check if the error is a 401/403 AND we are not already on the login page ---
-        if (error.response && (error.response.status === 401 || error.response.status === 403) && error.config.url !== '/auth/login') {
+        if (error.response && (error.response.status === 401 || error.response.status === 403)) {
             localStorage.removeItem('authToken');
             window.location.href = '/login';
         }
@@ -40,6 +39,10 @@ export const api = {
     updateCameraMonitorStatus: (id, isMonitored) => apiClient.put(`/cameras/${id}/monitor`, { isMonitored }),
     updateSiteMonitorStatus: (siteId, isMonitored) => apiClient.put(`/sites/${siteId}/monitor-all`, { isMonitored }),
     updateSiteProfile: (id, data) => apiClient.put(`/devices/${id}/profile`, data),
+    
+    // --- NEW GRANULAR FUNCTION ---
+    putCameraToSleep: (cameraId, hours) => apiClient.post(`/cameras/${cameraId}/sleep`, { hours }),
+
     getHistoricalAlerts: (filters) => apiClient.get('/alerts/history', { params: filters }),
     updateAlertStatus: (id, status) => apiClient.post(`/alerts/${id}/status`, { status }),
     addNoteToAlert: (alertId, noteText) => apiClient.post(`/alerts/${alertId}/notes`, { noteText }),
@@ -78,9 +81,7 @@ export const api = {
     createDispatchGroup: (data) => apiClient.post('/dispatch-groups', data),
     updateDispatchGroup: (id, data) => apiClient.put(`/dispatch-groups/${id}`, data),
     deleteDispatchGroup: (id) => apiClient.delete(`/dispatch-groups/${id}`),
+    getActiveAlerts: () => apiClient.get('/alerts/active'),
     getSystemSettings: () => apiClient.get('/settings'),
     updateSystemSettings: (data) => apiClient.put('/settings', data),
-    getActiveAlerts: () => apiClient.get('/alerts/active'),
-    resolveAllActiveAlerts: () => apiClient.post('/alerts/resolve-all'),
-    setPassword: (newPassword) => apiClient.post('/users/set-password', { newPassword }),
 };
