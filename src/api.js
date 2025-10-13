@@ -40,8 +40,9 @@ export const api = {
     updateSiteMonitorStatus: (siteId, isMonitored) => apiClient.put(`/sites/${siteId}/monitor-all`, { isMonitored }),
     updateSiteProfile: (id, data) => apiClient.put(`/devices/${id}/profile`, data),
     
-    // --- NEW GRANULAR FUNCTION ---
     putCameraToSleep: (cameraId, hours) => apiClient.post(`/cameras/${cameraId}/sleep`, { hours }),
+    // --- NEW FUNCTION ---
+    wakeUpCamera: (cameraId) => apiClient.post(`/cameras/${cameraId}/wakeup`),
 
     getHistoricalAlerts: (filters) => apiClient.get('/alerts/history', { params: filters }),
     updateAlertStatus: (id, status) => apiClient.post(`/alerts/${id}/status`, { status }),

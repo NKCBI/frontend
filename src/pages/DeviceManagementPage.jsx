@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronDown, ChevronRight, Pen, Save, X, Moon } from 'lucide-react';
+import { ChevronDown, ChevronRight, Pen, Save, X, Moon, Sun } from 'lucide-react'; // Added Sun icon
 import { api } from '../api';
 
 function DeviceManagementPage() {
@@ -7,7 +7,6 @@ function DeviceManagementPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [openSites, setOpenSites] = useState({});
     
-    // State for the modals
     const [editingSite, setEditingSite] = useState(null);
     const [sleepingCamera, setSleepingCamera] = useState(null);
 
@@ -34,7 +33,6 @@ function DeviceManagementPage() {
     const handleMonitorToggle = async (cameraId, currentStatus) => {
         try {
             await api.updateCameraMonitorStatus(cameraId, !currentStatus);
-            // Optimistic UI update
             setDevices(prevDevices => prevDevices.map(site => ({
                 ...site,
                 cameras: site.cameras.map(camera =>
@@ -64,7 +62,7 @@ function DeviceManagementPage() {
         try {
             await api.updateSiteProfile(siteToSave._id, siteToSave);
             setEditingSite(null);
-            loadDevices(); // Reload data to show changes
+            loadDevices();
         } catch (error) {
             console.error("Failed to save site:", error);
             alert("Error saving site profile.");
@@ -75,10 +73,21 @@ function DeviceManagementPage() {
         try {
             await api.putCameraToSleep(cameraId, hours);
             setSleepingCamera(null);
-            loadDevices(); // Reload data to show the new sleep status
+            loadDevices();
         } catch (error) {
             console.error("Failed to put camera to sleep:", error);
             alert("Error putting camera to sleep.");
+        }
+    };
+
+    // --- NEW HANDLER for waking a camera up ---
+    const handleWakeUpCamera = async (cameraId) => {
+        try {
+            await api.wakeUpCamera(cameraId);
+            loadDevices(); // Reload data to show the updated status
+        } catch (error) {
+            console.error("Failed to wake up camera:", error);
+            alert("Error waking up camera.");
         }
     };
 
@@ -127,9 +136,16 @@ function DeviceManagementPage() {
                                                                 )}
                                                             </div>
                                                             <div className="flex items-center space-x-3">
-                                                                <button onClick={() => setSleepingCamera(camera)} className="p-1 text-gray-400 hover:text-white" title="Put camera to sleep">
-                                                                    <Moon size={16} />
-                                                                </button>
+                                                                {/* --- NEW CONDITIONAL BUTTON --- */}
+                                                                {isSleeping ? (
+                                                                    <button onClick={() => handleWakeUpCamera(camera.id)} className="p-1 text-yellow-400 hover:text-yellow-300" title="Wake up camera">
+                                                                        <Sun size={16} />
+                                                                    </button>
+                                                                ) : (
+                                                                    <button onClick={() => setSleepingCamera(camera)} className="p-1 text-gray-400 hover:text-white" title="Put camera to sleep">
+                                                                        <Moon size={16} />
+                                                                    </button>
+                                                                )}
                                                                 <label className="relative inline-flex items-center cursor-pointer">
                                                                     <input type="checkbox" checked={camera.isMonitored} onChange={() => handleMonitorToggle(camera.id, camera.isMonitored)} className="sr-only peer" />
                                                                     <div className="w-11 h-6 bg-gray-600 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
@@ -148,25 +164,12 @@ function DeviceManagementPage() {
                 )}
             </div>
 
-            {editingSite && (
-                <SiteEditModal
-                    site={editingSite}
-                    onClose={() => setEditingSite(null)}
-                    onSave={handleSaveSite}
-                />
-            )}
-            {sleepingCamera && (
-                <CameraSleepModal
-                    camera={sleepingCamera}
-                    onClose={() => setSleepingCamera(null)}
-                    onConfirm={handleSleepCamera}
-                />
-            )}
+            {editingSite && ( <SiteEditModal site={editingSite} onClose={() => setEditingSite(null)} onSave={handleSaveSite} /> )}
+            {sleepingCamera && ( <CameraSleepModal camera={sleepingCamera} onClose={() => setSleepingCamera(null)} onConfirm={handleSleepCamera} /> )}
         </div>
     );
 }
 
-// Modal for putting an individual camera to sleep
 function CameraSleepModal({ camera, onClose, onConfirm }) {
     const [hours, setHours] = useState(1);
     return (
@@ -194,8 +197,6 @@ function CameraSleepModal({ camera, onClose, onConfirm }) {
     );
 }
 
-
-// Modal for editing site profile information
 function SiteEditModal({ site, onClose, onSave }) {
     const [formData, setFormData] = useState(site);
     const handleChange = (e) => setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
