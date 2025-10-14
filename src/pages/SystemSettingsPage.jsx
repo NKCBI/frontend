@@ -78,13 +78,13 @@ function SystemSettingsPage() {
         <div className="space-y-8 text-white">
             <h1 className="text-3xl font-bold">System Settings</h1>
             
-            <div className="bg-gray-800 p-6 rounded-lg shadow-lg">
-                <p className="text-gray-400 mb-6">Configure global settings for the application. Changes require a backend restart to apply.</p>
+            <div className="bg-brand-800 p-6 rounded-lg shadow-lg">
+                <p className="text-brand-400 mb-6">Configure global settings for the application. Changes require a backend restart to apply.</p>
                 
                 {isLoading ? <p>Loading settings...</p> : (
                     <div className="space-y-6 max-w-xl">
                         <div>
-                            <label className="block text-sm font-medium text-gray-300 mb-2">Turing API Access Tokens</label>
+                            <label className="block text-sm font-medium text-brand-300 mb-2">Turing API Access Tokens</label>
                             <div className="space-y-3">
                                 {settings.turingApiTokens.map((token, index) => (
                                     <div key={index} className="flex items-center space-x-2">
@@ -92,13 +92,13 @@ function SystemSettingsPage() {
                                             type="password"
                                             value={token}
                                             onChange={(e) => handleTokenChange(index, e.target.value)}
-                                            className="flex-grow bg-gray-700 border-gray-600 rounded-md text-white"
+                                            className="flex-grow bg-brand-700 border-brand-600 rounded-md text-white"
                                             placeholder={`API Token #${index + 1}`}
                                         />
                                         <button 
                                             type="button"
                                             onClick={() => handleRemoveToken(index)} 
-                                            className="text-gray-400 hover:text-red-400 p-2"
+                                            className="text-brand-400 hover:text-red-400 p-2"
                                             title="Remove Token"
                                         >
                                             <Trash2 size={16} />
@@ -109,7 +109,7 @@ function SystemSettingsPage() {
                              <button
                                 type="button"
                                 onClick={handleAddToken}
-                                className="mt-3 flex items-center text-sm text-blue-400 hover:text-blue-300"
+                                className="mt-3 flex items-center text-sm text-accent hover:text-accent-hover"
                             >
                                 <PlusCircle size={16} className="mr-2" />
                                 Add Another Token
@@ -117,40 +117,40 @@ function SystemSettingsPage() {
                         </div>
 
                         <div>
-                            <label htmlFor="webhookSecret" className="block text-sm font-medium text-gray-300 mb-1">Webhook Secret</label>
+                            <label htmlFor="webhookSecret" className="block text-sm font-medium text-brand-300 mb-1">Webhook Secret</label>
                             <input
                                 type="password"
                                 id="webhookSecret"
                                 name="webhookSecret"
                                 value={settings.webhookSecret || ''}
                                 onChange={handleChange}
-                                className="w-full bg-gray-700 border-gray-600 rounded-md text-white"
+                                className="w-full bg-brand-700 border-brand-600 rounded-md text-white"
                                 placeholder="Paste your webhook secret here"
                             />
-                            <p className="text-xs text-gray-500 mt-1">This secret is used to verify incoming webhook requests from Turing.</p>
+                            <p className="text-xs text-brand-400 mt-1">This secret is used to verify incoming webhook requests from Turing.</p>
                         </div>
 
                         <div>
-                            <label htmlFor="timezone" className="block text-sm font-medium text-gray-300 mb-1">System Timezone</label>
+                            <label htmlFor="timezone" className="block text-sm font-medium text-brand-300 mb-1">System Timezone</label>
                             <select
                                 id="timezone"
                                 name="timezone"
                                 value={settings.timezone}
                                 onChange={handleChange}
-                                className="w-full bg-gray-700 border-gray-600 rounded-md text-white"
+                                className="w-full bg-brand-700 border-brand-600 rounded-md text-white"
                             >
                                 {timezones.map(tz => (
                                     <option key={tz} value={tz}>{tz}</option>
                                 ))}
                             </select>
-                            <p className="text-xs text-gray-500 mt-1">This timezone will be used for all schedule calculations.</p>
+                            <p className="text-xs text-brand-400 mt-1">This timezone will be used for all schedule calculations.</p>
                         </div>
                         
                         <div className="flex justify-end">
                             <button
                                 onClick={handleSave}
                                 disabled={isSaving}
-                                className="flex items-center px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 disabled:bg-gray-500"
+                                className="flex items-center px-4 py-2 bg-accent text-brand-900 font-semibold rounded-lg hover:bg-accent-hover disabled:bg-brand-500"
                             >
                                 <Save size={16} className="mr-2" />
                                 {isSaving ? 'Saving...' : 'Save Settings'}

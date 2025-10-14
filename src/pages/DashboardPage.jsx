@@ -29,7 +29,7 @@ function DashboardPage() {
         if (confirmation) {
             try {
                 const response = await api.resolveAllActiveAlerts();
-                alert(response.data.message || "Active alerts resolved successfully.");
+                alert(response.data.message || "Active alerts resolved successfully. The Dispatcher Dashboard queue has been cleared.");
             } catch (error) {
                 console.error("Failed to resolve active alerts:", error);
                 alert("An error occurred while resolving alerts.");
@@ -57,7 +57,7 @@ function DashboardPage() {
                             <div key={site._id} className="bg-yellow-800/50 p-3 rounded-md flex justify-between items-center">
                                 <span>{site.name}</span>
                                 <Link 
-                                    to="/sites" 
+                                    to="/devices" 
                                     className="text-sm bg-yellow-600 hover:bg-yellow-500 text-white font-bold py-1 px-3 rounded"
                                 >
                                     Configure
@@ -69,21 +69,21 @@ function DashboardPage() {
             )}
 
             {unconfiguredSites.length === 0 && !isLoading && (
-                 <div className="bg-gray-800 p-6 rounded-lg shadow-lg">
+                 <div className="bg-brand-800 p-6 rounded-lg shadow-lg">
                     <h2 className="text-xl font-semibold text-green-400">System Ready</h2>
-                    <p className="text-gray-300 mt-2">All synchronized sites have been configured. The system is ready to monitor for events.</p>
+                    <p className="text-brand-300 mt-2">All synchronized sites have been configured. The system is ready to monitor for events.</p>
                 </div>
             )}
 
-            <div className="bg-gray-800 p-6 rounded-lg shadow-lg">
+            <div className="bg-brand-800 p-6 rounded-lg shadow-lg">
                 <h2 className="text-xl font-semibold text-yellow-400">Administrative Actions</h2>
-                <div className="mt-4 border-t border-gray-700 pt-4">
-                    <p className="text-gray-400 mb-4">
+                <div className="mt-4 border-t border-brand-700 pt-4">
+                    <p className="text-brand-400 mb-4">
                         This action will mark all "New" or "Acknowledged" alerts as "Resolved". This is useful for clearing the active queue for all dispatchers after a testing period or system maintenance.
                     </p>
                     <button 
                         onClick={handleResolveAllAlerts}
-                        className="flex items-center px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 whitespace-nowrap"
+                        className="flex items-center px-4 py-2 bg-accent text-brand-900 font-semibold rounded-lg hover:bg-accent-hover whitespace-nowrap"
                     >
                         <CheckCheck size={16} className="mr-2"/> Mass Resolve All Unresolved Alerts
                     </button>
