@@ -33,14 +33,14 @@ function AdminLayout() {
   };
 
   return (
-    <div className="bg-gray-900 text-gray-200 font-sans min-h-screen flex">
+    <div className="bg-brand-900 text-brand-300 font-sans min-h-screen flex">
       
       <aside 
-        className={`w-64 bg-gray-800 p-4 border-r border-gray-700 flex flex-col fixed top-0 left-0 h-full z-40 transition-transform duration-300 ease-in-out ${isSidebarVisible ? 'translate-x-0' : '-translate-x-full'}`}
+        className={`w-64 bg-brand-800 p-4 border-r border-brand-700 flex flex-col fixed top-0 left-0 h-full z-40 transition-transform duration-300 ease-in-out ${isSidebarVisible ? 'translate-x-0' : '-translate-x-full'}`}
       >
         <div className="p-4">
             <h1 className="text-2xl font-bold text-white">Admin Panel</h1>
-            <p className="text-xs text-gray-400">Welcome, {user?.username}</p>
+            <p className="text-xs text-brand-400">Welcome, {user?.username}</p>
         </div>
         
         <nav className="flex-1 space-y-2 overflow-y-auto px-4">
@@ -49,7 +49,7 @@ function AdminLayout() {
                     key={item.to}
                     to={item.to}
                     className={({ isActive }) =>
-                        `flex items-center w-full px-4 py-3 text-left rounded-lg transition-colors duration-200 ${isActive ? 'bg-blue-600 text-white' : 'text-gray-400 hover:bg-gray-700 hover:text-white'}`
+                        `flex items-center w-full px-4 py-3 text-left rounded-lg transition-colors duration-200 ${isActive ? 'bg-accent text-brand-900 font-semibold' : 'text-brand-400 hover:bg-brand-700 hover:text-white'}`
                     }
                 >
                     {item.icon}
@@ -58,20 +58,20 @@ function AdminLayout() {
             ))}
         </nav>
         
-        <div className="p-4 border-t border-gray-700">
+        <div className="p-4 border-t border-brand-700">
              {adminNavItems.map(item => (
                 <NavLink
                     key={item.to}
                     to={item.to}
                     className={({ isActive }) =>
-                        `flex items-center w-full px-4 py-3 text-left rounded-lg transition-colors duration-200 ${isActive ? 'bg-blue-600 text-white' : 'text-gray-400 hover:bg-gray-700 hover:text-white'}`
+                        `flex items-center w-full px-4 py-3 text-left rounded-lg transition-colors duration-200 ${isActive ? 'bg-accent text-brand-900 font-semibold' : 'text-brand-400 hover:bg-brand-700 hover:text-white'}`
                     }
                 >
                     {item.icon}
                     <span className="ml-3">{item.label}</span>
                 </NavLink>
             ))}
-            <button onClick={handleLogout} title="Logout" className="flex items-center w-full px-4 py-3 text-left text-gray-400 hover:bg-gray-700 hover:text-white rounded-lg transition-colors duration-200 mt-2">
+            <button onClick={handleLogout} title="Logout" className="flex items-center w-full px-4 py-3 text-left text-brand-400 hover:bg-brand-700 hover:text-white rounded-lg transition-colors duration-200 mt-2">
                 <LogOut size={20} />
                 <span className="ml-3">Logout</span>
             </button>
@@ -80,7 +80,7 @@ function AdminLayout() {
 
       <button
         onClick={() => setIsSidebarVisible(!isSidebarVisible)}
-        className="fixed top-1/2 -translate-y-1/2 z-50 p-2 bg-gray-800 rounded-r-lg text-gray-300 hover:bg-gray-700 hover:text-white transition-all duration-300 ease-in-out"
+        className="fixed top-1/2 -translate-y-1/2 z-50 p-2 bg-brand-800 rounded-r-lg text-brand-300 hover:bg-brand-700 hover:text-white transition-all duration-300 ease-in-out"
         style={{ left: isSidebarVisible ? '16rem' : '0' }}
         title={isSidebarVisible ? "Collapse Sidebar" : "Expand Sidebar"}
       >

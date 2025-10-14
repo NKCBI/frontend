@@ -34,19 +34,19 @@ function DispatcherDashboard() {
     const audioContextRef = useRef(null);
     const socketRef = useRef(null);
     const alertTimeoutRef = useRef(null);
-    const viewModeRef = useRef(viewMode);
     const reconnectTimeoutRef = useRef(null);
     const reconnectAttemptRef = useRef(0);
     const modalCloseTimeoutRef = useRef(null);
+    const justOpenedModalRef = useRef(false);
     
-    useEffect(() => {
-        viewModeRef.current = viewMode;
-    }, [viewMode]);
-
+    // --- REFS for state values to use in stable callbacks ---
+    const viewingSiteIdRef = useRef(viewingSiteId);
+    viewingSiteIdRef.current = viewingSiteId;
+    const viewModeRef = useRef(viewMode);
+    viewModeRef.current = viewMode;
     const monitoredDevicesRef = useRef(monitoredDevices);
-    useEffect(() => {
-        monitoredDevicesRef.current = monitoredDevices;
-    }, [monitoredDevices]);
+    monitoredDevicesRef.current = monitoredDevices;
+
 
     const playAlertSound = () => {
         if (!audioContextRef.current) {
@@ -119,6 +119,7 @@ function DispatcherDashboard() {
 
     const handleAlertSelect = (alert) => {
         if (modalCloseTimeoutRef.current) clearTimeout(modalCloseTimeoutRef.current);
+        justOpenedModalRef.current = true;
         setViewingSiteId(alert.siteProfile._id);
         const { camera, site } = findCameraById(alert.cameraId);
         if (camera && site) handleFocusCamera(camera, site);
@@ -156,28 +157,41 @@ function DispatcherDashboard() {
 
             socket.onmessage = (event) => {
                 const message = JSON.parse(event.data);
+                
                 if (message.type === 'new_alert') {
                     const adaptedAlert = adaptServerAlert(message.alert);
                     setAlerts(prev => prev.some(a => a.id === adaptedAlert.id) ? prev : [adaptedAlert, ...prev]);
                     playAlertSound();
-                    if (!viewingSiteId) setViewingSiteId(adaptedAlert.siteProfile._id);
-                    else if (viewingSiteId === adaptedAlert.siteProfile._id && modalCloseTimeoutRef.current) clearTimeout(modalCloseTimeoutRef.current);
+                    
+                    if (!viewingSiteIdRef.current) {
+                        setViewingSiteId(adaptedAlert.siteProfile._id);
+                    } else if (viewingSiteIdRef.current === adaptedAlert.siteProfile._id && modalCloseTimeoutRef.current) {
+                        clearTimeout(modalCloseTimeoutRef.current);
+                    }
+
                     if (viewModeRef.current === 'videoWall') {
                         setAlertingCameraId(adaptedAlert.cameraId);
                         if (alertTimeoutRef.current) clearTimeout(alertTimeoutRef.current);
                         alertTimeoutRef.current = setTimeout(() => setAlertingCameraId(null), 10000);
-                    } else if (!viewingSiteId) {
+                    } else if (!viewingSiteIdRef.current) {
                         const { camera, site } = findCameraById(adaptedAlert.cameraId);
                         if (camera && site) handleFocusCamera(camera, site);
                     }
                 } else if (message.type === 'update_alert') {
                     const adaptedAlert = adaptServerAlert(message.alert);
-                    setAlerts(prev => prev.map(a => a.id === adaptedAlert.id ? adaptedAlert : a));
+                    setAlerts(prev => {
+                        const existing = prev.find(a => a.id === adaptedAlert.id);
+                        if (existing) {
+                            return prev.map(a => a.id === adaptedAlert.id ? adaptedAlert : a);
+                        }
+                        return [adaptedAlert, ...prev];
+                    });
                 }
             };
         };
 
         connect();
+
         return () => {
             if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
             if (socketRef.current) {
@@ -188,17 +202,14 @@ function DispatcherDashboard() {
             if (modalCloseTimeoutRef.current) clearTimeout(modalCloseTimeoutRef.current);
         };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [viewingSiteId, setAlerts]); // Use setAlerts from context
+    }, [setAlerts]);
 
-    // --- SESSION RESTORE LOGIC ---
     useEffect(() => {
         const fetchInitialData = async () => {
             try {
-                // First, fetch the device list, which is always needed.
                 const { data: devicesData } = await api.getMonitoredDevices();
                 if(Array.isArray(devicesData)) setMonitoredDevices(devicesData);
 
-                // Then, check for a saved session.
                 const savedSessionJSON = localStorage.getItem(SESSION_KEY);
                 if (savedSessionJSON) {
                     const savedSession = JSON.parse(savedSessionJSON);
@@ -207,12 +218,11 @@ function DispatcherDashboard() {
                     if (isSessionValid) {
                         console.log("Restoring previous session state.");
                         setAlerts(savedSession.alerts);
-                        localStorage.removeItem(SESSION_KEY); // Clear after restoring
-                        return; // Stop here, don't fetch from API
+                        localStorage.removeItem(SESSION_KEY);
+                        return;
                     }
                 }
                 
-                // If no valid session, fetch fresh data from the API.
                 console.log("No valid session found. Fetching fresh alert data.");
                 const { data: activeAlertsData } = await api.getActiveAlerts();
                 if (Array.isArray(activeAlertsData)) {
@@ -222,16 +232,21 @@ function DispatcherDashboard() {
             } catch (error) {
                 console.error("Failed to fetch initial data:", error);
                 setMonitoredDevices([]);
+                setAlerts([]);
             }
         };
         fetchInitialData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [user, setAlerts]); // Dependency on user and setAlerts from context
+    }, [user, setAlerts]);
 
     const handleUpdateStatus = async (alert, status) => {
         if (!alert) return;
         try {
-            await api.updateAlertStatus(alert.id, status);
+            const response = await api.updateAlertStatus(alert.id, status);
+            if (response.data && response.data.alert) {
+                const updatedAlert = adaptServerAlert(response.data.alert);
+                setAlerts(prev => prev.map(a => a.id === updatedAlert.id ? updatedAlert : a));
+            }
         } catch (error) {
             console.error(`Failed to update alert status to ${status}:`, error);
         }
@@ -240,7 +255,11 @@ function DispatcherDashboard() {
     const handleAddNote = async (alert, noteText) => {
         if (!alert || !noteText.trim()) return;
         try {
-            await api.addNoteToAlert(alert.id, noteText);
+            const response = await api.addNoteToAlert(alert.id, noteText);
+            if (response.data && response.data.alert) {
+                const updatedAlert = adaptServerAlert(response.data.alert);
+                setAlerts(prev => prev.map(a => a.id === updatedAlert.id ? updatedAlert : a));
+            }
         } catch (error) {
             console.error("Failed to add note:", error);
         }
@@ -249,26 +268,48 @@ function DispatcherDashboard() {
     const alertsForViewingSite = viewingSiteId ? alerts.filter(a => a.siteProfile._id === viewingSiteId) : [];
         
     useEffect(() => {
+        if (modalCloseTimeoutRef.current) clearTimeout(modalCloseTimeoutRef.current);
+
+        if (justOpenedModalRef.current) {
+            justOpenedModalRef.current = false;
+            return;
+        }
+    
         if (viewingSiteId && alertsForViewingSite.length > 0) {
             const allResolved = alertsForViewingSite.every(a => a.status === 'Resolved');
             if (allResolved) {
-                modalCloseTimeoutRef.current = setTimeout(() => setViewingSiteId(null), 1500);
+                modalCloseTimeoutRef.current = setTimeout(() => {
+                    setViewingSiteId(null);
+                }, 1500);
             }
         }
-        return () => { if (modalCloseTimeoutRef.current) clearTimeout(modalCloseTimeoutRef.current); }
+    
+        return () => {
+            if (modalCloseTimeoutRef.current) clearTimeout(modalCloseTimeoutRef.current);
+        };
     }, [alertsForViewingSite, viewingSiteId]);
 
     const handleAcknowledgeAll = async () => {
         const alertsToAck = alertsForViewingSite.filter(a => a.status === 'New');
         const promises = alertsToAck.map(alert => api.updateAlertStatus(alert.id, 'Acknowledged'));
-        try { await Promise.all(promises); } 
+        try {
+            const results = await Promise.all(promises);
+            const updatedAlerts = results.map(res => adaptServerAlert(res.data.alert));
+            const updatedAlertsMap = new Map(updatedAlerts.map(a => [a.id, a]));
+            setAlerts(prev => prev.map(a => updatedAlertsMap.get(a.id) || a));
+        } 
         catch (error) { console.error("Failed to acknowledge all alerts:", error); }
     };
 
     const handleResolveIncident = async () => {
         const alertsToResolve = alertsForViewingSite.filter(a => a.status !== 'Resolved');
         const promises = alertsToResolve.map(alert => api.updateAlertStatus(alert.id, 'Resolved'));
-        try { await Promise.all(promises); } 
+        try {
+            const results = await Promise.all(promises);
+            const updatedAlerts = results.map(res => adaptServerAlert(res.data.alert));
+            const updatedAlertsMap = new Map(updatedAlerts.map(a => [a.id, a]));
+            setAlerts(prev => prev.map(a => updatedAlertsMap.get(a.id) || a));
+        } 
         catch (error) { console.error("Failed to resolve incident:", error); }
     };
 
@@ -277,14 +318,14 @@ function DispatcherDashboard() {
     const recentAlerts = alerts.slice(0, 50);
 
     return (
-        <div className="flex flex-col h-screen bg-gray-900 text-gray-200 font-sans">
-            <header className="bg-gray-800 border-b border-gray-700 shadow-md">
+        <div className="flex flex-col h-screen bg-brand-900 text-brand-300 font-sans">
+            <header className="bg-brand-800 border-b border-brand-700 shadow-md">
                  <div className="mx-auto max-w-full px-4 sm:px-6 lg:px-8">
                     <div className="flex h-16 items-center justify-between">
                         <div className="flex items-center space-x-4">
-                            <button onClick={() => setIsSiteListVisible(!isSiteListVisible)} title="Toggle Site List" className="p-2 text-gray-400 hover:text-white"><PanelLeftClose /></button>
+                            <button onClick={() => setIsSiteListVisible(!isSiteListVisible)} title="Toggle Site List" className="p-2 text-brand-400 hover:text-white"><PanelLeftClose /></button>
                             <h1 className="text-2xl font-bold tracking-tight text-white">Dispatch Dashboard</h1>
-                            <button onClick={handleVideoWall} title="Global Video Wall" className="p-2 text-gray-400 hover:text-white"><LayoutGrid /></button>
+                            <button onClick={handleVideoWall} title="Global Video Wall" className="p-2 text-brand-400 hover:text-white"><LayoutGrid /></button>
                         </div>
                         <div className="flex items-center space-x-6">
                             <div className="flex items-center space-x-2">
@@ -292,13 +333,13 @@ function DispatcherDashboard() {
                                     <span className={`absolute inline-flex h-full w-full rounded-full ${connectionStatus === 'Connected' ? 'bg-green-400' : 'bg-red-400'} opacity-75`}></span>
                                     <span className={`relative inline-flex rounded-full h-3 w-3 ${connectionStatus === 'Connected' ? 'bg-green-500' : 'bg-red-500'}`}></span>
                                 </span>
-                                <span className="text-gray-400 text-sm">{connectionStatus}</span>
+                                <span className="text-brand-400 text-sm">{connectionStatus}</span>
                             </div>
                             <div className="flex items-center space-x-3">
-                                <span className="text-sm text-gray-300">Welcome, {user?.username}</span>
-                                <button onClick={logout} title="Logout" className="p-2 text-gray-400 hover:text-white rounded-full hover:bg-gray-700 transition-colors"><LogOut size={20} /></button>
+                                <span className="text-sm text-brand-300">Welcome, {user?.username}</span>
+                                <button onClick={logout} title="Logout" className="p-2 text-brand-400 hover:text-white rounded-full hover:bg-brand-700 transition-colors"><LogOut size={20} /></button>
                             </div>
-                            <button onClick={() => setIsAlertLogVisible(!isAlertLogVisible)} title="Toggle Event Log" className="p-2 text-gray-400 hover:text-white"><PanelRightClose /></button>
+                            <button onClick={() => setIsAlertLogVisible(!isAlertLogVisible)} title="Toggle Event Log" className="p-2 text-brand-400 hover:text-white"><PanelRightClose /></button>
                         </div>
                     </div>
                 </div>
@@ -306,21 +347,21 @@ function DispatcherDashboard() {
 
             <main className="flex flex-1 overflow-hidden">
                 {isSiteListVisible && (
-                    <div className="w-1/4 flex flex-col border-r border-gray-700 max-w-xs">
-                        <div className="p-4 border-b border-gray-700 bg-gray-800"><h2 className="text-lg font-semibold">Sites & Cameras</h2></div>
-                        <div className="flex-1 overflow-y-auto p-2 space-y-1 bg-gray-900">
+                    <div className="w-1/4 flex flex-col border-r border-brand-700 max-w-xs">
+                        <div className="p-4 border-b border-brand-700 bg-brand-800"><h2 className="text-lg font-semibold text-white">Sites & Cameras</h2></div>
+                        <div className="flex-1 overflow-y-auto p-2 space-y-1 bg-brand-900">
                             {monitoredDevices.map(site => (
-                                <div key={site._id} className="bg-gray-800 rounded-lg">
+                                <div key={site._id} className="bg-brand-800 rounded-lg">
                                     <div className="w-full flex justify-between items-center p-3 text-left">
                                         <button onClick={() => toggleSite(site._id)} className="flex items-center flex-1">
                                             {openSites[site._id] ? <ChevronDown size={18} className="mr-2" /> : <ChevronRight size={18} className="mr-2" />}
-                                            <h3 className="font-semibold text-blue-300">{site.name}</h3>
+                                            <h3 className="font-semibold text-accent">{site.name}</h3>
                                         </button>
-                                        <button onClick={() => handleShowGrid(site)} title="Show site grid view" className="p-1 text-gray-400 hover:text-white"><Grid3x3 size={18} /></button>
+                                        <button onClick={() => handleShowGrid(site)} title="Show site grid view" className="p-1 text-brand-400 hover:text-white"><Grid3x3 size={18} /></button>
                                     </div>
                                     {openSites[site._id] && (
-                                        <div className="border-t border-gray-700 p-2"><div className="space-y-1">
-                                            {site.cameras.map(camera => (<button key={camera.id} onClick={() => handleFocusCamera(camera, site)} className={`w-full text-left p-2 rounded text-sm hover:bg-gray-700 transition-colors ${focusedCamera?.id === camera.id && viewMode === 'focus' ? 'bg-blue-600 text-white' : 'text-gray-300'}`}>{camera.name}</button>))}
+                                        <div className="border-t border-brand-700 p-2"><div className="space-y-1">
+                                            {site.cameras.map(camera => (<button key={camera.id} onClick={() => handleFocusCamera(camera, site)} className={`w-full text-left p-2 rounded text-sm hover:bg-brand-700 transition-colors ${focusedCamera?.id === camera.id && viewMode === 'focus' ? 'bg-accent text-brand-900 font-semibold' : 'text-brand-300'}`}>{camera.name}</button>))}
                                         </div></div>
                                     )}
                                 </div>
@@ -349,18 +390,18 @@ function DispatcherDashboard() {
                         </div>
                     )}
                     {!focusedCamera && !gridSite && viewMode !== 'videoWall' && (
-                        <div className="text-center text-gray-500">
+                        <div className="text-center text-brand-400">
                              <Video size={48} className="mx-auto mb-4" />
-                            <h2 className="text-2xl text-gray-300 font-semibold">Live View</h2>
+                            <h2 className="text-2xl text-brand-300 font-semibold">Live View</h2>
                             <p className="mt-2">Select a camera or site to begin viewing.</p>
                         </div>
                     )}
                 </div>
                 
                 {isAlertLogVisible && (
-                    <div className="w-1/4 flex flex-col border-l border-gray-700 max-w-sm">
-                        <div className="p-4 border-b border-gray-700 bg-gray-800"><h2 className="text-lg font-semibold">Real-time Event Log</h2></div>
-                        <div className="flex-1 overflow-y-auto p-2 space-y-2 bg-gray-900">
+                    <div className="w-1/4 flex flex-col border-l border-brand-700 max-w-sm">
+                        <div className="p-4 border-b border-brand-700 bg-brand-800"><h2 className="text-lg font-semibold text-white">Real-time Event Log</h2></div>
+                        <div className="flex-1 overflow-y-auto p-2 space-y-2 bg-brand-900">
                             {recentAlerts.map(alert => <AlertItem key={alert.id} alert={alert} onSelect={() => handleAlertSelect(alert)} isActive={viewingSiteId === alert.siteProfile._id} />)}
                         </div>
                     </div>
@@ -385,16 +426,16 @@ function DispatcherDashboard() {
 }
 
 function AlertItem({ alert, onSelect, isActive }) {
-    const statusInfo = { 'New': 'bg-red-500', 'Acknowledged': 'bg-yellow-500', 'Resolved': 'bg-gray-600' }[alert.status] || 'bg-gray-500';
-    const itemClasses = alert.status === 'Resolved' ? 'opacity-50 hover:opacity-75' : 'hover:bg-gray-700/70';
+    const statusInfo = { 'New': 'bg-red-500', 'Acknowledged': 'bg-yellow-500', 'Resolved': 'bg-brand-700' }[alert.status] || 'bg-brand-700';
+    const itemClasses = alert.status === 'Resolved' ? 'opacity-50 hover:opacity-75' : 'hover:bg-brand-700/70';
     return (
-        <div onClick={onSelect} className={`flex items-center p-3 rounded-lg cursor-pointer border-l-4 transition-all ${itemClasses} ${isActive && alert.status !== 'Resolved' ? 'bg-gray-700 border-blue-500' : 'border-transparent'}`}>
+        <div onClick={onSelect} className={`flex items-center p-3 rounded-lg cursor-pointer border-l-4 transition-all ${itemClasses} ${isActive && alert.status !== 'Resolved' ? 'bg-brand-700 border-accent' : 'border-transparent'}`}>
             <span className={`h-3 w-3 rounded-full ${statusInfo} mr-3 flex-shrink-0`}></span>
             <div className="flex-1">
-                <p className={`font-semibold ${alert.status === 'Resolved' ? 'text-gray-400' : 'text-white'}`}>{alert.type}</p>
-                <p className="text-sm text-gray-400">{alert.cameraName}</p>
+                <p className={`font-semibold ${alert.status === 'Resolved' ? 'text-brand-400' : 'text-white'}`}>{alert.type}</p>
+                <p className="text-sm text-brand-400">{alert.cameraName}</p>
             </div>
-            <time className="text-xs text-gray-500">{new Date(alert.createdAt).toLocaleTimeString()}</time>
+            <time className="text-xs text-brand-400">{new Date(alert.createdAt).toLocaleTimeString()}</time>
         </div>
     );
 }

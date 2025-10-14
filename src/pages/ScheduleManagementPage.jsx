@@ -93,10 +93,10 @@ function ScheduleManagementPage() {
     return (
         <div className="space-y-8 text-white">
             <h1 className="text-3xl font-bold">Monitoring Schedules</h1>
-             <div className="bg-gray-800 p-6 rounded-lg shadow-lg">
+             <div className="bg-brand-800 p-6 rounded-lg shadow-lg">
                 <div className="flex justify-between items-center mb-4">
-                    <p className="text-gray-400 max-w-2xl">Create reusable schedules and assign cameras to them. Only cameras that are enabled for monitoring in 'Device Management' will appear in the assignment list.</p>
-                    <button onClick={handleOpenCreateWizard} className="flex items-center px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 whitespace-nowrap">
+                    <p className="text-brand-400 max-w-2xl">Create reusable schedules and assign cameras to them. Only cameras that are enabled for monitoring in 'Device Management' will appear in the assignment list.</p>
+                    <button onClick={handleOpenCreateWizard} className="flex items-center px-4 py-2 bg-accent text-brand-900 font-semibold rounded-lg hover:bg-accent-hover whitespace-nowrap">
                         <PlusCircle size={16} className="mr-2"/> Create New Schedule
                     </button>
                 </div>
@@ -104,12 +104,12 @@ function ScheduleManagementPage() {
                 {isLoading ? <p>Loading schedules...</p> : (
                     <div className="space-y-3">
                         {schedules.map(schedule => (
-                            <div key={schedule._id} className="bg-gray-700/60 p-4 rounded-lg flex justify-between items-center">
+                            <div key={schedule._id} className="bg-brand-700/60 p-4 rounded-lg flex justify-between items-center">
                                 <div>
-                                    <p className="font-semibold">{schedule.name}</p>
-                                    <p className="text-sm text-gray-400">{Object.values(assignments).filter(id => id === schedule._id).length} camera(s) assigned</p>
+                                    <p className="font-semibold text-white">{schedule.name}</p>
+                                    <p className="text-sm text-brand-400">{Object.values(assignments).filter(id => id === schedule._id).length} camera(s) assigned</p>
                                 </div>
-                                <button onClick={() => handleOpenEditWizard(schedule)} className="flex items-center px-3 py-1 text-sm bg-gray-600 hover:bg-gray-500 rounded-md">
+                                <button onClick={() => handleOpenEditWizard(schedule)} className="flex items-center px-3 py-1 text-sm bg-brand-600 hover:bg-brand-500 text-white rounded-md">
                                     <Pen size={14} className="mr-2"/> Edit
                                 </button>
                             </div>
@@ -157,22 +157,22 @@ function ScheduleWizard({ initialSchedule, onClose, onSave, onDelete, allAssignm
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
-            <div className="bg-gray-800 rounded-lg shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
-                <div className="p-5 border-b border-gray-700 flex justify-between items-center">
-                    <h2 className="text-xl font-bold">{title}: <span className="text-blue-400">{schedule.name || '...'}</span></h2>
-                    <button onClick={onClose} className="text-gray-400 hover:text-white"><X size={24}/></button>
+            <div className="bg-brand-800 rounded-lg shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+                <div className="p-5 border-b border-brand-700 flex justify-between items-center">
+                    <h2 className="text-xl font-bold text-white">{title}: <span className="text-accent">{schedule.name || '...'}</span></h2>
+                    <button onClick={onClose} className="text-brand-400 hover:text-white"><X size={24}/></button>
                 </div>
 
                 <div className="p-5 flex-1 overflow-y-auto">
                     {/* Progress Bar */}
                     <div className="mb-8">
                         <div className="flex justify-between mb-1">
-                            <span className={`text-sm font-medium ${step >= 1 ? 'text-blue-400' : 'text-gray-500'}`}>Details</span>
-                            <span className={`text-sm font-medium ${step >= 2 ? 'text-blue-400' : 'text-gray-500'}`}>Time Blocks</span>
-                            <span className={`text-sm font-medium ${step >= 3 ? 'text-blue-400' : 'text-gray-500'}`}>Assignments</span>
+                            <span className={`text-sm font-medium ${step >= 1 ? 'text-accent' : 'text-brand-400'}`}>Details</span>
+                            <span className={`text-sm font-medium ${step >= 2 ? 'text-accent' : 'text-brand-400'}`}>Time Blocks</span>
+                            <span className={`text-sm font-medium ${step >= 3 ? 'text-accent' : 'text-brand-400'}`}>Assignments</span>
                         </div>
-                        <div className="w-full bg-gray-700 rounded-full h-1.5">
-                            <div className="bg-blue-600 h-1.5 rounded-full" style={{width: `${((step - 1) / 2) * 100}%`}}></div>
+                        <div className="w-full bg-brand-700 rounded-full h-1.5">
+                            <div className="bg-accent h-1.5 rounded-full" style={{width: `${((step - 1) / 2) * 100}%`}}></div>
                         </div>
                     </div>
                     
@@ -181,15 +181,15 @@ function ScheduleWizard({ initialSchedule, onClose, onSave, onDelete, allAssignm
                     {step === 3 && <Step3_Assignments schedule={schedule} allAssignments={allAssignments} localAssignments={localAssignments} setLocalAssignments={setLocalAssignments} />}
                 </div>
 
-                <div className="bg-gray-700/50 px-5 py-4 flex justify-between items-center">
+                <div className="bg-brand-700/50 px-5 py-4 flex justify-between items-center">
                     <div>
                         {initialSchedule._id && <button onClick={() => onDelete(initialSchedule._id, initialSchedule.name)} className="flex items-center px-4 py-2 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700"><Trash2 size={16} className="mr-2"/> Delete</button>}
                     </div>
                     <div className="space-x-4">
-                        <button onClick={onClose} className="px-4 py-2 bg-gray-600 text-white font-semibold rounded-lg hover:bg-gray-500">Cancel</button>
-                        {step > 1 && <button onClick={handleBack} className="px-4 py-2 bg-gray-600 text-white font-semibold rounded-lg hover:bg-gray-500">Back</button>}
-                        {step < 3 && <button onClick={handleNext} disabled={!schedule.name} className="px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 disabled:bg-gray-500">Next</button>}
-                        {step === 3 && <button onClick={handleFinalSave} className="flex items-center px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700"><Save size={16} className="mr-2"/> Save Schedule</button>}
+                        <button onClick={onClose} className="px-4 py-2 bg-brand-600 text-white font-semibold rounded-lg hover:bg-brand-500">Cancel</button>
+                        {step > 1 && <button onClick={handleBack} className="px-4 py-2 bg-brand-600 text-white font-semibold rounded-lg hover:bg-brand-500">Back</button>}
+                        {step < 3 && <button onClick={handleNext} disabled={!schedule.name} className="px-4 py-2 bg-accent text-brand-900 font-semibold rounded-lg hover:bg-accent-hover disabled:bg-brand-500 disabled:text-brand-300">Next</button>}
+                        {step === 3 && <button onClick={handleFinalSave} className="flex items-center px-4 py-2 bg-accent text-brand-900 font-semibold rounded-lg hover:bg-accent-hover"><Save size={16} className="mr-2"/> Save Schedule</button>}
                     </div>
                 </div>
             </div>
@@ -200,12 +200,12 @@ function ScheduleWizard({ initialSchedule, onClose, onSave, onDelete, allAssignm
 function Step1_Details({ schedule, setSchedule }) {
     return (
         <div>
-            <h3 className="text-lg font-semibold mb-4">Schedule Name</h3>
-            <p className="text-sm text-gray-400 mb-2">Give this schedule a descriptive name (e.g., "Weekday Monitoring", "Overnight Security").</p>
+            <h3 className="text-lg font-semibold text-white mb-4">Schedule Name</h3>
+            <p className="text-sm text-brand-400 mb-2">Give this schedule a descriptive name (e.g., "Weekday Monitoring", "Overnight Security").</p>
             <input
                 type="text"
                 placeholder="Enter schedule name"
-                className="w-full bg-gray-700 border-gray-600 rounded-md text-white"
+                className="w-full bg-brand-700 border-brand-600 rounded-md text-white"
                 value={schedule.name}
                 onChange={(e) => setSchedule({...schedule, name: e.target.value})}
                 autoFocus
@@ -266,25 +266,25 @@ function Step2_TimeBlocks({ schedule, setSchedule }) {
                 const isAllDay = dayBlocks.length === 1 && dayBlocks[0].startTime === '00:00' && dayBlocks[0].endTime === '23:59';
 
                 return(
-                    <div key={dayIndex} className="border-t border-gray-700 pt-4">
+                    <div key={dayIndex} className="border-t border-brand-700 pt-4">
                         <div className="flex justify-between items-center mb-2">
-                            <h4 className="font-semibold">{day}</h4>
+                            <h4 className="font-semibold text-white">{day}</h4>
                             <div className="flex items-center space-x-4">
-                                <button onClick={() => handleSetAllDay(dayIndex)} className={`text-sm font-medium ${isAllDay ? 'text-green-400' : 'text-gray-400 hover:text-white'}`}>
+                                <button onClick={() => handleSetAllDay(dayIndex)} className={`text-sm font-medium ${isAllDay ? 'text-green-400' : 'text-brand-400 hover:text-white'}`}>
                                     All Day
                                 </button>
-                                <button onClick={() => openCopyModal(dayIndex)} className="text-sm text-gray-400 hover:text-white flex items-center"><Copy size={14} className="mr-1"/> Copy to...</button>
-                                <button onClick={() => handleAddTimeBlock(dayIndex)} disabled={isAllDay} className="text-sm text-blue-400 hover:text-blue-300 disabled:text-gray-500 disabled:cursor-not-allowed">+ Add Time Block</button>
+                                <button onClick={() => openCopyModal(dayIndex)} className="text-sm text-brand-400 hover:text-white flex items-center"><Copy size={14} className="mr-1"/> Copy to...</button>
+                                <button onClick={() => handleAddTimeBlock(dayIndex)} disabled={isAllDay} className="text-sm text-accent hover:text-accent-hover disabled:text-brand-500 disabled:cursor-not-allowed">+ Add Time Block</button>
                             </div>
                         </div>
                         <div className="space-y-2">
-                            {(schedule.days[dayIndex] || []).length === 0 && <p className="text-xs text-gray-500 pl-4">No monitoring scheduled for this day.</p>}
+                            {(schedule.days[dayIndex] || []).length === 0 && <p className="text-xs text-brand-400 pl-4">No monitoring scheduled for this day.</p>}
                             {(schedule.days[dayIndex] || []).map((block, blockIndex) => (
                                 <div key={blockIndex} className="flex items-center space-x-2 pl-4">
-                                    <input type="time" value={block.startTime} disabled={isAllDay} onChange={(e) => handleTimeBlockChange(dayIndex, blockIndex, 'startTime', e.target.value)} className="w-full bg-gray-900 border-gray-600 rounded-md p-1 text-sm disabled:opacity-50"/>
-                                    <span className="text-gray-400">to</span>
-                                    <input type="time" value={block.endTime} disabled={isAllDay} onChange={(e) => handleTimeBlockChange(dayIndex, blockIndex, 'endTime', e.target.value)} className="w-full bg-gray-900 border-gray-600 rounded-md p-1 text-sm disabled:opacity-50"/>
-                                    <button onClick={() => handleRemoveTimeBlock(dayIndex, blockIndex)} disabled={isAllDay} className="text-red-400 hover:text-red-300 disabled:text-gray-600 disabled:cursor-not-allowed"><X size={20}/></button>
+                                    <input type="time" value={block.startTime} disabled={isAllDay} onChange={(e) => handleTimeBlockChange(dayIndex, blockIndex, 'startTime', e.target.value)} className="w-full bg-brand-900 border-brand-600 rounded-md p-1 text-sm disabled:opacity-50"/>
+                                    <span className="text-brand-400">to</span>
+                                    <input type="time" value={block.endTime} disabled={isAllDay} onChange={(e) => handleTimeBlockChange(dayIndex, blockIndex, 'endTime', e.target.value)} className="w-full bg-brand-900 border-brand-600 rounded-md p-1 text-sm disabled:opacity-50"/>
+                                    <button onClick={() => handleRemoveTimeBlock(dayIndex, blockIndex)} disabled={isAllDay} className="text-red-400 hover:text-red-300 disabled:text-brand-600 disabled:cursor-not-allowed"><X size={20}/></button>
                                 </div>
                             ))}
                         </div>
@@ -311,26 +311,26 @@ function CopyTimeBlocksModal({ sourceDayIndex, onCopy, onClose }) {
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[60]">
-            <div className="bg-gray-800 rounded-lg shadow-xl w-full max-w-md">
-                <div className="p-5 border-b border-gray-700">
-                    <h3 className="text-lg font-semibold">Copy {DAYS_OF_WEEK[sourceDayIndex]}'s schedule</h3>
+            <div className="bg-brand-800 rounded-lg shadow-xl w-full max-w-md">
+                <div className="p-5 border-b border-brand-700">
+                    <h3 className="text-lg font-semibold text-white">Copy {DAYS_OF_WEEK[sourceDayIndex]}'s schedule</h3>
                 </div>
                 <div className="p-6">
-                    <p className="text-sm text-gray-400 mb-4">Select the days you want to apply this time schedule to.</p>
+                    <p className="text-sm text-brand-400 mb-4">Select the days you want to apply this time schedule to.</p>
                     <div className="grid grid-cols-2 gap-2">
                         {DAYS_OF_WEEK.map((day, index) => {
                             if (index === sourceDayIndex) return null;
                             return (
-                                <button key={index} onClick={() => toggleDay(index)} className={`p-2 rounded-md text-sm text-left ${selectedDays.includes(index) ? 'bg-blue-600 text-white' : 'bg-gray-700 hover:bg-gray-600'}`}>
+                                <button key={index} onClick={() => toggleDay(index)} className={`p-2 rounded-md text-sm text-left ${selectedDays.includes(index) ? 'bg-accent text-brand-900 font-semibold' : 'bg-brand-700 hover:bg-brand-600 text-white'}`}>
                                     {day}
                                 </button>
                             )
                         })}
                     </div>
                 </div>
-                <div className="bg-gray-700/50 px-6 py-4 flex justify-end space-x-3">
-                    <button onClick={onClose} className="px-4 py-2 bg-gray-600 text-white font-semibold rounded-lg hover:bg-gray-500">Cancel</button>
-                    <button onClick={handleConfirmCopy} disabled={selectedDays.length === 0} className="px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 disabled:bg-gray-500">Copy</button>
+                <div className="bg-brand-700/50 px-6 py-4 flex justify-end space-x-3">
+                    <button onClick={onClose} className="px-4 py-2 bg-brand-600 text-white font-semibold rounded-lg hover:bg-brand-500">Cancel</button>
+                    <button onClick={handleConfirmCopy} disabled={selectedDays.length === 0} className="px-4 py-2 bg-accent text-brand-900 font-semibold rounded-lg hover:bg-accent-hover disabled:bg-brand-500 disabled:text-brand-300">Copy</button>
                 </div>
             </div>
         </div>
@@ -359,7 +359,6 @@ function Step3_Assignments({ schedule, allAssignments, localAssignments, setLoca
 
     const assignedCameras = allMonitoredCameras.filter(cam => localAssignments[cam.id]);
     
-    // --- FIX: Simplified the filter to only check against the current schedule's assignments ---
     const availableCameras = allMonitoredCameras.filter(cam => !localAssignments[cam.id]);
 
     const moveCamera = (cameraId, to) => {
@@ -378,17 +377,16 @@ function Step3_Assignments({ schedule, allAssignments, localAssignments, setLoca
 
     return (
         <div className="flex space-x-6 h-[50vh]">
-            {/* Available Cameras Panel */}
             <div className="w-1/2 flex flex-col">
-                <h3 className="text-lg font-semibold mb-2">Available Cameras</h3>
-                <div className="bg-gray-900 rounded-lg p-3 flex-1 overflow-y-auto">
+                <h3 className="text-lg font-semibold text-white mb-2">Available Cameras</h3>
+                <div className="bg-brand-900 rounded-lg p-3 flex-1 overflow-y-auto">
                     {availableCameras.map(cam => (
-                        <div key={cam.id} className="flex items-center justify-between p-2 rounded hover:bg-gray-700/50">
+                        <div key={cam.id} className="flex items-center justify-between p-2 rounded hover:bg-brand-700/50">
                             <div>
-                                <p className="text-sm font-medium">{cam.name}</p>
-                                <p className="text-xs text-gray-400">{cam.siteName}</p>
+                                <p className="text-sm font-medium text-white">{cam.name}</p>
+                                <p className="text-xs text-brand-400">{cam.siteName}</p>
                             </div>
-                            <button onClick={() => moveCamera(cam.id, 'assign')} className="p-1 rounded-full text-gray-400 hover:bg-gray-600 hover:text-white">
+                            <button onClick={() => moveCamera(cam.id, 'assign')} className="p-1 rounded-full text-brand-400 hover:bg-brand-600 hover:text-white">
                                 <ArrowRight size={16} />
                             </button>
                         </div>
@@ -396,18 +394,17 @@ function Step3_Assignments({ schedule, allAssignments, localAssignments, setLoca
                 </div>
             </div>
 
-            {/* Assigned Cameras Panel */}
             <div className="w-1/2 flex flex-col">
-                <h3 className="text-lg font-semibold mb-2">Assigned to this Schedule</h3>
-                <div className="bg-gray-900 rounded-lg p-3 flex-1 overflow-y-auto">
+                <h3 className="text-lg font-semibold text-white mb-2">Assigned to this Schedule</h3>
+                <div className="bg-brand-900 rounded-lg p-3 flex-1 overflow-y-auto">
                      {assignedCameras.map(cam => (
-                        <div key={cam.id} className="flex items-center justify-between p-2 rounded hover:bg-gray-700/50">
-                             <button onClick={() => moveCamera(cam.id, 'unassign')} className="p-1 rounded-full text-gray-400 hover:bg-gray-600 hover:text-white">
+                        <div key={cam.id} className="flex items-center justify-between p-2 rounded hover:bg-brand-700/50">
+                             <button onClick={() => moveCamera(cam.id, 'unassign')} className="p-1 rounded-full text-brand-400 hover:bg-brand-600 hover:text-white">
                                 <ArrowLeft size={16} />
                             </button>
-                            <div>
-                                <p className="text-sm font-medium">{cam.name}</p>
-                                <p className="text-xs text-gray-400">{cam.siteName}</p>
+                            <div className="text-right">
+                                <p className="text-sm font-medium text-white">{cam.name}</p>
+                                <p className="text-xs text-brand-400">{cam.siteName}</p>
                             </div>
                         </div>
                     ))}

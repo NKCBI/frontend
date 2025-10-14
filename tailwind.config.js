@@ -7,23 +7,23 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Define the "slate blue" and "cool gray" palette for backgrounds, surfaces, and text
+        // --- MODIFICATION: Updated to match the provided icon ---
         'brand': {
-          '900': '#1e293b', // Dark Slate Blue (Primary Background)
-          '800': '#334155', // Slate Blue (Surfaces, Modals)
-          '700': '#475569', // Slate Blue (Borders, Hover)
-          '400': '#94a3b8', // Cool Gray (Secondary Text)
-          '300': '#d1d5db', // Cool Gray (Primary Text)
+          '900': '#2f3b4d', // Darker Blue-Grey (Primary Background, from icon base)
+          '800': '#3d4a5c', // Medium Blue-Grey (Surfaces, Modals, from icon falcon body)
+          '700': '#57677b', // Lighter Blue-Grey (Borders, Hover, slightly lighter than falcon)
+          '400': '#a7b4c4', // Light Grey-Blue (Secondary Text, falcon highlights)
+          '300': '#e0e7ef', // Near White (Primary Text, falcon white details)
         },
-        // Define the "glowing cyan" as your primary accent color
+        // Accent color directly from the glowing location pin
         'accent': {
-          'DEFAULT': '#22d3ee', // Bright Cyan
-          'hover': '#67e8f9',   // Lighter Cyan for hover states
+          'DEFAULT': '#00e0ff', // Bright Cyan
+          'hover': '#40f0ff',   // Slightly lighter Cyan for hover states
         },
       },
       boxShadow: {
-        // Create a custom shadow utility for the "glowing" effect
-        'glow': '0 0 15px 0 rgba(34, 211, 238, 0.4)',
+        // Updated the glow effect to match the new Cyan accent color.
+        'glow': '0 0 15px 0 rgba(0, 224, 255, 0.4)',
       },
     },
   },

@@ -34,7 +34,6 @@ apiClient.interceptors.response.use(
 
 export const api = {
     login: (username, password) => apiClient.post('/auth/login', { username, password }),
-    // --- NEW FUNCTION ---
     changePassword: (currentPassword, newPassword) => apiClient.post('/auth/change-password', { currentPassword, newPassword }),
     
     getDevices: () => apiClient.get('/devices'),
@@ -49,6 +48,9 @@ export const api = {
     getHistoricalAlerts: (filters) => apiClient.get('/alerts/history', { params: filters }),
     updateAlertStatus: (id, status) => apiClient.post(`/alerts/${id}/status`, { status }),
     addNoteToAlert: (alertId, noteText) => apiClient.post(`/alerts/${alertId}/notes`, { noteText }),
+    // --- NEWLY ADDED FUNCTION ---
+    resolveAllActiveAlerts: () => apiClient.post('/alerts/resolve-all'),
+    
     getRtspUrl: (cameraId) => apiClient.post('/video/rtsp-url', { camera_id: cameraId }),
     startMediaMTXStream: (pathName, rtspUrl) => apiClient.post('/video/start-stream', { pathName, rtspUrl }),
     

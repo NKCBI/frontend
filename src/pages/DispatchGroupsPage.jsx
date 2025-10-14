@@ -69,22 +69,22 @@ function DispatchGroupsPage() {
     return (
         <div className="space-y-8 text-white">
             <h1 className="text-3xl font-bold">Dispatch Groups</h1>
-             <div className="bg-gray-800 p-6 rounded-lg shadow-lg">
+             <div className="bg-brand-800 p-6 rounded-lg shadow-lg">
                 <div className="flex justify-between items-center mb-4">
-                    <p className="text-gray-400 max-w-2xl">Create and manage groups of sites for dedicated monitoring desks. Assign these groups to Dispatcher users.</p>
-                    <button onClick={handleOpenCreateModal} className="flex items-center px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 whitespace-nowrap">
+                    <p className="text-brand-400 max-w-2xl">Create and manage groups of sites for dedicated monitoring desks. Assign these groups to Dispatcher users.</p>
+                    <button onClick={handleOpenCreateModal} className="flex items-center px-4 py-2 bg-accent text-brand-900 font-semibold rounded-lg hover:bg-accent-hover whitespace-nowrap">
                         <PlusCircle size={16} className="mr-2"/> Create New Group
                     </button>
                 </div>
                 {isLoading ? <p>Loading groups...</p> : (
                     <div className="space-y-3">
                         {groups.map(group => (
-                            <div key={group._id} className="bg-gray-700/60 p-4 rounded-lg flex justify-between items-center">
+                            <div key={group._id} className="bg-brand-700/60 p-4 rounded-lg flex justify-between items-center">
                                 <div>
-                                    <p className="font-semibold">{group.name}</p>
-                                    <p className="text-sm text-gray-400">{group.siteIds.length} site(s) assigned</p>
+                                    <p className="font-semibold text-white">{group.name}</p>
+                                    <p className="text-sm text-brand-400">{group.siteIds.length} site(s) assigned</p>
                                 </div>
-                                <button onClick={() => handleOpenEditModal(group)} className="flex items-center px-3 py-1 text-sm bg-gray-600 hover:bg-gray-500 rounded-md">
+                                <button onClick={() => handleOpenEditModal(group)} className="flex items-center px-3 py-1 text-sm bg-brand-600 hover:bg-brand-500 text-white rounded-md">
                                     <Pen size={14} className="mr-2"/> Edit
                                 </button>
                             </div>
@@ -140,46 +140,46 @@ function DispatchGroupModal({ group, onClose, onSave, onDelete }) {
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
-            <div className="bg-gray-800 rounded-lg shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
-                <div className="p-5 border-b border-gray-700 flex justify-between items-center">
-                    <h2 className="text-xl font-bold">{group._id ? 'Edit' : 'Create'} Dispatch Group</h2>
-                    <button onClick={onClose} className="text-gray-400 hover:text-white"><X size={24}/></button>
+            <div className="bg-brand-800 rounded-lg shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+                <div className="p-5 border-b border-brand-700 flex justify-between items-center">
+                    <h2 className="text-xl font-bold text-white">{group._id ? 'Edit' : 'Create'} Dispatch Group</h2>
+                    <button onClick={onClose} className="text-brand-400 hover:text-white"><X size={24}/></button>
                 </div>
                 <div className="p-6 space-y-4 flex-1 overflow-y-auto">
                     <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-1">Group Name</label>
-                        <input value={currentGroup.name} onChange={handleNameChange} className="w-full bg-gray-700 border-gray-600 rounded-md text-white"/>
+                        <label className="block text-sm font-medium text-brand-400 mb-1">Group Name</label>
+                        <input value={currentGroup.name} onChange={handleNameChange} className="w-full bg-brand-700 border-brand-600 rounded-md text-white"/>
                     </div>
                     <div className="flex space-x-6 h-[50vh] pt-4">
                         <div className="w-1/2 flex flex-col">
-                            <h3 className="text-lg font-semibold mb-2">Available Sites</h3>
-                            <div className="bg-gray-900 rounded-lg p-3 flex-1 overflow-y-auto">
+                            <h3 className="text-lg font-semibold text-white mb-2">Available Sites</h3>
+                            <div className="bg-brand-900 rounded-lg p-3 flex-1 overflow-y-auto">
                                 {availableSites.map(site => (
-                                    <div key={site._id} className="flex items-center justify-between p-2 rounded hover:bg-gray-700/50">
-                                        <p className="text-sm font-medium">{site.name}</p>
-                                        <button onClick={() => handleSiteMove(site._id, 'assign')} className="p-1 rounded-full text-gray-400 hover:bg-gray-600 hover:text-white"><ArrowRight size={16} /></button>
+                                    <div key={site._id} className="flex items-center justify-between p-2 rounded hover:bg-brand-700/50">
+                                        <p className="text-sm font-medium text-white">{site.name}</p>
+                                        <button onClick={() => handleSiteMove(site._id, 'assign')} className="p-1 rounded-full text-brand-400 hover:bg-brand-600 hover:text-white"><ArrowRight size={16} /></button>
                                     </div>
                                 ))}
                             </div>
                         </div>
                         <div className="w-1/2 flex flex-col">
-                            <h3 className="text-lg font-semibold mb-2">Assigned to Group</h3>
-                            <div className="bg-gray-900 rounded-lg p-3 flex-1 overflow-y-auto">
+                            <h3 className="text-lg font-semibold text-white mb-2">Assigned to Group</h3>
+                            <div className="bg-brand-900 rounded-lg p-3 flex-1 overflow-y-auto">
                                 {assignedSites.map(site => (
-                                     <div key={site._id} className="flex items-center justify-between p-2 rounded hover:bg-gray-700/50">
-                                        <button onClick={() => handleSiteMove(site._id, 'unassign')} className="p-1 rounded-full text-gray-400 hover:bg-gray-600 hover:text-white"><ArrowLeft size={16} /></button>
-                                        <p className="text-sm font-medium text-right">{site.name}</p>
+                                     <div key={site._id} className="flex items-center justify-between p-2 rounded hover:bg-brand-700/50">
+                                        <button onClick={() => handleSiteMove(site._id, 'unassign')} className="p-1 rounded-full text-brand-400 hover:bg-brand-600 hover:text-white"><ArrowLeft size={16} /></button>
+                                        <p className="text-sm font-medium text-right text-white">{site.name}</p>
                                     </div>
                                 ))}
                             </div>
                         </div>
                     </div>
                 </div>
-                <div className="bg-gray-700/50 px-6 py-4 flex justify-between items-center">
+                <div className="bg-brand-700/50 px-6 py-4 flex justify-between items-center">
                     {group._id && <button onClick={() => onDelete(group._id, group.name)} className="flex items-center px-4 py-2 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700"><Trash2 size={16} className="mr-2"/> Delete</button>}
                     <div className="space-x-3 ml-auto">
-                        <button onClick={onClose} className="px-4 py-2 bg-gray-600 text-white font-semibold rounded-lg hover:bg-gray-500">Cancel</button>
-                        <button onClick={() => onSave(currentGroup)} className="flex items-center px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700"><Save size={16} className="mr-2"/> Save Group</button>
+                        <button onClick={onClose} className="px-4 py-2 bg-brand-600 text-white font-semibold rounded-lg hover:bg-brand-500">Cancel</button>
+                        <button onClick={() => onSave(currentGroup)} className="flex items-center px-4 py-2 bg-accent text-brand-900 font-semibold rounded-lg hover:bg-accent-hover"><Save size={16} className="mr-2"/> Save Group</button>
                     </div>
                 </div>
             </div>
@@ -188,4 +188,3 @@ function DispatchGroupModal({ group, onClose, onSave, onDelete }) {
 }
 
 export default DispatchGroupsPage;
-

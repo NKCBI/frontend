@@ -7,23 +7,18 @@ function IncidentModal({ siteName, alertsForSite, onClose, onAcknowledge, onReso
     const [noteError, setNoteError] = useState('');
     const notesEndRef = useRef(null);
 
-    // --- BUG FIX: This useEffect is corrected to properly sync state ---
+    const isIncidentResolved = alertsForSite.every(a => a.status === 'Resolved');
+
     useEffect(() => {
         if (alertsForSite && alertsForSite.length > 0) {
-            // If an alert is already selected, find its updated version in the new prop array.
-            // This ensures we always show the freshest data (e.g., with new notes).
             if (selectedAlert) {
                 const updatedSelectedAlert = alertsForSite.find(a => a.id === selectedAlert.id);
-                // If the selected alert still exists, update our state to its new version.
-                // If not (e.g., it was resolved), default to the newest alert in the list.
                 setSelectedAlert(updatedSelectedAlert || alertsForSite[0]);
             } else {
-                // If no alert is selected yet, default to the newest one.
                 setSelectedAlert(alertsForSite[0]);
             }
         }
-    // The dependency array is critical. It should ONLY depend on the incoming prop.
-    }, [alertsForSite]);
+    }, [alertsForSite, selectedAlert]);
     
     useEffect(() => {
         if (selectedAlert) {
@@ -40,19 +35,23 @@ function IncidentModal({ siteName, alertsForSite, onClose, onAcknowledge, onReso
     };
 
     const handleResolve = () => {
-        const hasNote = selectedAlert.notes.some(note => note.username === currentUser.username);
-        if (!hasNote) {
-            setNoteError('A note is required before resolving an alert.');
-            return;
+        if (currentUser.role !== 'Administrator') {
+            const hasNote = selectedAlert.notes.some(note => note.username === currentUser.username);
+            if (!hasNote) {
+                setNoteError('A note is required before resolving an alert.');
+                return;
+            }
         }
         onResolve(selectedAlert);
     };
     
     const handleResolveAll = () => {
-        const hasAnyNote = alertsForSite.some(alert => alert.notes.some(note => note.username === currentUser.username));
-        if (!hasAnyNote) {
-            setNoteError('At least one note is required before resolving the incident.');
-            return;
+        if (currentUser.role !== 'Administrator') {
+            const hasAnyNote = alertsForSite.some(alert => alert.notes.some(note => note.username === currentUser.username));
+            if (!hasAnyNote) {
+                setNoteError('At least one note is required before resolving the incident.');
+                return;
+            }
         }
         onResolveAll();
     };
@@ -91,7 +90,8 @@ function IncidentModal({ siteName, alertsForSite, onClose, onAcknowledge, onReso
                                     </button>
                                      <button
                                         onClick={handleResolveAll}
-                                        className="flex items-center px-3 py-2 bg-green-500 text-white font-semibold rounded-lg hover:bg-green-600 text-sm"
+                                        disabled={isIncidentResolved}
+                                        className="flex items-center px-3 py-2 bg-green-500 text-white font-semibold rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                                     >
                                         <ShieldCheck size={16} className="mr-2"/> Resolve Incident
                                     </button>
@@ -112,7 +112,7 @@ function IncidentModal({ siteName, alertsForSite, onClose, onAcknowledge, onReso
                                 onClick={() => { setSelectedAlert(alert); setNoteError(''); }}
                                 className={`w-full text-left p-3 rounded-lg transition-colors border-l-4 ${selectedAlert.id === alert.id ? 'bg-accent/20 border-accent' : 'bg-brand-700/50 hover:bg-brand-700 border-transparent'} ${alert.status === 'Resolved' ? 'opacity-50' : ''}`}
                             >
-                                <p className="font-semibold">{alert.type}</p>
+                                <p className="font-semibold text-white">{alert.type}</p>
                                 <p className="text-sm text-brand-300">{alert.cameraName}</p>
                                 <p className="text-xs text-brand-400 mt-1">{new Date(alert.createdAt).toLocaleTimeString()}</p>
                             </button>
@@ -128,7 +128,7 @@ function IncidentModal({ siteName, alertsForSite, onClose, onAcknowledge, onReso
                         <div className="flex-1 grid grid-cols-2 gap-6 mt-6">
                             <div className="flex flex-col min-h-0">
                                 <div className="flex justify-between items-center mb-2 flex-shrink-0">
-                                    <h3 className="text-lg font-semibold">Dispatcher Notes</h3>
+                                    <h3 className="text-lg font-semibold text-white">Dispatcher Notes</h3>
                                     {noteError && <span className="text-xs text-red-400 flex items-center"><AlertCircle size={14} className="mr-1"/> {noteError}</span>}
                                 </div>
                                 <div className="bg-brand-900/50 rounded-lg p-3 flex-1 overflow-y-auto space-y-3">
@@ -170,7 +170,7 @@ function IncidentModal({ siteName, alertsForSite, onClose, onAcknowledge, onReso
 
                 <div className="bg-brand-700/50 px-6 py-4 flex justify-end space-x-4">
                     <button onClick={() => onAcknowledge(selectedAlert)} className="px-4 py-2 bg-yellow-500 text-white font-semibold rounded-lg hover:bg-yellow-600 disabled:opacity-50 disabled:cursor-not-allowed" disabled={selectedAlert.status !== 'New'}>Acknowledge</button>
-                    <button onClick={handleResolve} className="px-4 py-2 bg-green-500 text-white font-semibold rounded-lg hover:bg-green-600">Resolve</button>
+                    <button onClick={handleResolve} className="px-4 py-2 bg-green-500 text-white font-semibold rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed" disabled={selectedAlert.status === 'Resolved'}>Resolve</button>
                 </div>
             </div>
         </div>
