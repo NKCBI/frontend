@@ -52,39 +52,39 @@ function ChangePasswordPage() {
         <div className="space-y-8 text-white">
             <h1 className="text-3xl font-bold">Change Password</h1>
 
-            <div className="bg-gray-800 p-6 rounded-lg shadow-lg max-w-xl">
+            <div className="bg-brand-800 p-6 rounded-lg shadow-lg max-w-xl">
                 <form onSubmit={handleSubmit} className="space-y-6">
                     <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-1">Current Password</label>
+                        <label className="block text-sm font-medium text-brand-300 mb-1">Current Password</label>
                         <input
                             type="password"
                             name="currentPassword"
                             value={passwords.currentPassword}
                             onChange={handleChange}
                             required
-                            className="w-full bg-gray-700 border-gray-600 rounded-md text-white"
+                            className="w-full bg-brand-700 border-brand-600 rounded-md text-white"
                         />
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-1">New Password</label>
+                        <label className="block text-sm font-medium text-brand-300 mb-1">New Password</label>
                         <input
                             type="password"
                             name="newPassword"
                             value={passwords.newPassword}
                             onChange={handleChange}
                             required
-                            className="w-full bg-gray-700 border-gray-600 rounded-md text-white"
+                            className="w-full bg-brand-700 border-brand-600 rounded-md text-white"
                         />
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-1">Confirm New Password</label>
+                        <label className="block text-sm font-medium text-brand-300 mb-1">Confirm New Password</label>
                         <input
                             type="password"
                             name="confirmPassword"
                             value={passwords.confirmPassword}
                             onChange={handleChange}
                             required
-                            className="w-full bg-gray-700 border-gray-600 rounded-md text-white"
+                            className="w-full bg-brand-700 border-brand-600 rounded-md text-white"
                         />
                     </div>
 
@@ -92,7 +92,7 @@ function ChangePasswordPage() {
                         <button
                             type="submit"
                             disabled={isSaving || success}
-                            className="flex items-center px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 disabled:bg-gray-500"
+                            className="flex items-center px-4 py-2 bg-accent text-brand-900 font-semibold rounded-lg hover:bg-accent-hover disabled:bg-brand-500"
                         >
                             <Save size={16} className="mr-2" />
                             {isSaving ? 'Saving...' : 'Update Password'}
