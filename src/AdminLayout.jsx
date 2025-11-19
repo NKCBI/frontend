@@ -8,7 +8,10 @@ import {
 
 const navItems = [
     { to: "/dashboard", icon: <LayoutDashboard size={20} />, label: "Dashboard" },
-    { to: "/dispatcher-dashboard", icon: <RadioTower size={20} />, label: "Live Dispatch" },
+    // --- NEW: Alerts Only Dispatch (Default for Dispatchers) ---
+    { to: "/alerts", icon: <RadioTower size={20} />, label: "Alerts Only Dispatch" },
+    // --- MODIFIED: Renamed the existing live video page ---
+    { to: "/dispatcher-dashboard", icon: <RadioTower size={20} />, label: "Live Video Dashboard" },
     { to: "/devices", icon: <Building size={20} />, label: "Device & Site Mgmt" },
     { to: "/schedules", icon: <CalendarClock size={20} />, label: "Schedules" },
     { to: "/dispatch-groups", icon: <Users size={20} />, label: "Dispatch Groups" },

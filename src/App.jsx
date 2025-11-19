@@ -11,7 +11,8 @@ import UserManagementPage from './pages/UserManagementPage';
 import DispatchGroupsPage from './pages/DispatchGroupsPage';
 import SystemSettingsPage from './pages/SystemSettingsPage';
 import DispatcherDashboard from './pages/DispatcherDashboard';
-import ChangePasswordPage from './pages/ChangePasswordPage'; // --- NEW: Import the new page ---
+import AlertsOnlyPage from './pages/AlertsOnlyPage'; // --- NEW: Import the new page ---
+import ChangePasswordPage from './pages/ChangePasswordPage';
 
 function ProtectedRoute({ children }) {
   const { user, isLoading } = useAuth();
@@ -44,7 +45,7 @@ function App() {
         <Route path="/" element={
           !user ? <Navigate to="/login" replace /> :
           user.role === 'Administrator' ? <Navigate to="/dashboard" replace /> :
-          user.role === 'Dispatcher' ? <Navigate to="/dispatcher-dashboard" replace /> :
+          user.role === 'Dispatcher' ? <Navigate to="/alerts" replace /> : // --- MODIFIED: Dispatcher default route is now /alerts ---
           <Navigate to="/login" replace />
         } />
 
@@ -57,7 +58,10 @@ function App() {
         <Route path="settings" element={<SystemSettingsPage />} />
         <Route path="dispatcher-dashboard" element={<DispatcherDashboard />} />
         
-        {/* --- NEW: Add the route for the change password page --- */}
+        {/* --- NEW: Add the route for the alerts-only dispatch page --- */}
+        <Route path="alerts" element={<AlertsOnlyPage />} />
+        
+        {/* --- EXISTING: Change password route --- */}
         <Route path="change-password" element={<ChangePasswordPage />} />
       </Route>
     </Routes>

@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { api } from '../api.js';
 import { useAuth } from '../context/AuthContext.jsx';
-import { LogOut, ChevronDown, ChevronRight, PanelLeftClose, PanelRightClose, Video, Grid3x3, LayoutGrid, X } from 'lucide-react';
+import { LogOut, PanelRightClose, X } from 'lucide-react';
 import IncidentModal from './IncidentModal.jsx';
-import CameraView from '../components/CameraView.jsx';
 
 // --- Helper Functions & Constants ---
 const getWsUrl = () => {
@@ -15,25 +14,50 @@ const getWsUrl = () => {
 const SESSION_KEY = 'vms_dispatch_session';
 const SESSION_TIMEOUT = 15 * 60 * 1000; // 15 minutes
 
+
+// Helper to adapt server alert format
+const adaptServerAlert = (serverAlert) => {
+    const turingData = serverAlert.originalData;
+    let snapshotUrl = `https://placehold.co/600x400/111827/9CA3AF?text=No+Snapshot`;
+    let clipUrl = null; 
+
+    // Find Snapshot
+    if (turingData.mediums?.find(m => m.name === 'snapshot')?.files?.[0]?.url) {
+        snapshotUrl = turingData.mediums.find(m => m.name === 'snapshot').files[0].url;
+    }
+    
+    // Find Clip
+    const clipMedium = turingData.mediums?.find(m => m.name === 'clip' && m.files?.[0]?.url);
+    if (clipMedium) {
+        clipUrl = clipMedium.files[0].url;
+    } else {
+        const mp4Medium = turingData.mediums?.find(m => m.files?.[0]?.url?.endsWith('.mp4'));
+        if (mp4Medium) {
+            clipUrl = mp4Medium.files[0].url;
+        }
+    }
+    
+    return { 
+        ...serverAlert, 
+        id: serverAlert._id, 
+        type: turingData.event_type?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'Unknown Event', 
+        cameraName: turingData.camera?.name || 'Unknown Camera', 
+        cameraId: turingData.camera?.id, 
+        snapshotUrl: snapshotUrl,
+        clipUrl: clipUrl // Crucial: ensure clipUrl is passed
+    };
+};
+
 // Main Dashboard Component
-function DispatcherDashboard() {
-    // --- STATE REFACTOR: Use global state from AuthContext ---
+function AlertsOnlyPage() {
     const { user, logout, alerts, setAlerts } = useAuth();
     
-    const [monitoredDevices, setMonitoredDevices] = useState([]);
     const [connectionStatus, setConnectionStatus] = useState('Connecting...');
     const [viewingSiteId, setViewingSiteId] = useState(null);
-    const [openSites, setOpenSites] = useState({});
-    const [isSiteListVisible, setIsSiteListVisible] = useState(true);
     const [isAlertLogVisible, setIsAlertLogVisible] = useState(true);
-    const [viewMode, setViewMode] = useState('focus');
-    const [focusedCamera, setFocusedCamera] = useState(null);
-    const [gridSite, setGridSite] = useState(null);
-    const [alertingCameraId, setAlertingCameraId] = useState(null);
 
     const audioContextRef = useRef(null);
     const socketRef = useRef(null);
-    const alertTimeoutRef = useRef(null);
     const reconnectTimeoutRef = useRef(null);
     const reconnectAttemptRef = useRef(0);
     const modalCloseTimeoutRef = useRef(null);
@@ -42,10 +66,6 @@ function DispatcherDashboard() {
     // --- REFS for state values to use in stable callbacks ---
     const viewingSiteIdRef = useRef(viewingSiteId);
     viewingSiteIdRef.current = viewingSiteId;
-    const viewModeRef = useRef(viewMode);
-    viewModeRef.current = viewMode;
-    const monitoredDevicesRef = useRef(monitoredDevices);
-    monitoredDevicesRef.current = monitoredDevices;
 
 
     const playAlertSound = () => {
@@ -78,76 +98,10 @@ function DispatcherDashboard() {
         osc2.stop(now + duration);
     };
     
-    // --- MODIFIED: adaptServerAlert to include clipUrl ---
-    const adaptServerAlert = (serverAlert) => {
-        const turingData = serverAlert.originalData;
-        let snapshotUrl = `https://placehold.co/600x400/111827/9CA3AF?text=No+Snapshot`;
-        let clipUrl = null; 
-
-        // Find Snapshot
-        if (turingData.mediums?.find(m => m.name === 'snapshot')?.files?.[0]?.url) {
-            snapshotUrl = turingData.mediums.find(m => m.name === 'snapshot').files[0].url;
-        }
-        
-        // Find Clip
-        const clipMedium = turingData.mediums?.find(m => m.name === 'clip' && m.files?.[0]?.url);
-        if (clipMedium) {
-            clipUrl = clipMedium.files[0].url;
-        } else {
-            const mp4Medium = turingData.mediums?.find(m => m.files?.[0]?.url?.endsWith('.mp4'));
-            if (mp4Medium) {
-                clipUrl = mp4Medium.files[0].url;
-            }
-        }
-        
-        return { 
-            ...serverAlert, 
-            id: serverAlert._id, 
-            type: turingData.event_type?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'Unknown Event', 
-            cameraName: turingData.camera?.name || 'Unknown Camera', 
-            cameraId: turingData.camera?.id, 
-            snapshotUrl: snapshotUrl,
-            clipUrl: clipUrl 
-        };
-    };
-    // ---------------------------------------------------
-
-    const findCameraById = (cameraId) => {
-        for (const site of monitoredDevicesRef.current) {
-            const camera = site.cameras.find(c => c.id === cameraId);
-            if (camera) return { camera, site };
-        }
-        return { camera: null, site: null };
-    };
-
-    const handleFocusCamera = (cameraToFocus, site) => {
-        if (!cameraToFocus) return;
-        setViewMode('focus');
-        setGridSite(null);
-        setFocusedCamera({ ...cameraToFocus, siteName: site.name });
-        if (site) {
-            setOpenSites(prev => ({ ...prev, [site._id]: true }));
-        }
-    };
-
-    const handleShowGrid = (site) => {
-        setViewMode('grid');
-        setGridSite(site);
-        setFocusedCamera(null);
-    };
-    
-    const handleVideoWall = () => {
-        setViewMode('videoWall');
-        setGridSite(null);
-        setFocusedCamera(null);
-    };
-
     const handleAlertSelect = (alert) => {
         if (modalCloseTimeoutRef.current) clearTimeout(modalCloseTimeoutRef.current);
         justOpenedModalRef.current = true;
         setViewingSiteId(alert.siteProfile._id);
-        const { camera, site } = findCameraById(alert.cameraId);
-        if (camera && site) handleFocusCamera(camera, site);
     };
 
     useEffect(() => {
@@ -193,15 +147,6 @@ function DispatcherDashboard() {
                     } else if (viewingSiteIdRef.current === adaptedAlert.siteProfile._id && modalCloseTimeoutRef.current) {
                         clearTimeout(modalCloseTimeoutRef.current);
                     }
-
-                    if (viewModeRef.current === 'videoWall') {
-                        setAlertingCameraId(adaptedAlert.cameraId);
-                        if (alertTimeoutRef.current) clearTimeout(alertTimeoutRef.current);
-                        alertTimeoutRef.current = setTimeout(() => setAlertingCameraId(null), 10000);
-                    } else if (!viewingSiteIdRef.current) {
-                        const { camera, site } = findCameraById(adaptedAlert.cameraId);
-                        if (camera && site) handleFocusCamera(camera, site);
-                    }
                 } else if (message.type === 'update_alert') {
                     const adaptedAlert = adaptServerAlert(message.alert);
                     setAlerts(prev => {
@@ -223,7 +168,6 @@ function DispatcherDashboard() {
                 socketRef.current.onclose = null; 
                 socketRef.current.close();
             }
-            if (alertTimeoutRef.current) clearTimeout(alertTimeoutRef.current);
             if (modalCloseTimeoutRef.current) clearTimeout(modalCloseTimeoutRef.current);
         };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -232,9 +176,6 @@ function DispatcherDashboard() {
     useEffect(() => {
         const fetchInitialData = async () => {
             try {
-                const { data: devicesData } = await api.getMonitoredDevices();
-                if(Array.isArray(devicesData)) setMonitoredDevices(devicesData);
-
                 const savedSessionJSON = localStorage.getItem(SESSION_KEY);
                 if (savedSessionJSON) {
                     const savedSession = JSON.parse(savedSessionJSON);
@@ -256,7 +197,6 @@ function DispatcherDashboard() {
 
             } catch (error) {
                 console.error("Failed to fetch initial data:", error);
-                setMonitoredDevices([]);
                 setAlerts([]);
             }
         };
@@ -338,7 +278,6 @@ function DispatcherDashboard() {
         catch (error) { console.error("Failed to resolve incident:", error); }
     };
 
-    const toggleSite = (siteId) => setOpenSites(prev => ({ ...prev, [siteId]: !prev[siteId] }));
     const viewingSiteName = alertsForViewingSite[0]?.siteProfile?.name || 'Incident';
     const recentAlerts = alerts.slice(0, 50);
 
@@ -348,9 +287,7 @@ function DispatcherDashboard() {
                  <div className="mx-auto max-w-full px-4 sm:px-6 lg:px-8">
                     <div className="flex h-16 items-center justify-between">
                         <div className="flex items-center space-x-4">
-                            <button onClick={() => setIsSiteListVisible(!isSiteListVisible)} title="Toggle Site List" className="p-2 text-brand-400 hover:text-white"><PanelLeftClose /></button>
-                            <h1 className="text-2xl font-bold tracking-tight text-white">Dispatch Dashboard</h1>
-                            <button onClick={handleVideoWall} title="Global Video Wall" className="p-2 text-brand-400 hover:text-white"><LayoutGrid /></button>
+                            <h1 className="text-2xl font-bold tracking-tight text-white">Alerts Only Dispatch Dashboard</h1>
                         </div>
                         <div className="flex items-center space-x-6">
                             <div className="flex items-center space-x-2">
@@ -371,60 +308,17 @@ function DispatcherDashboard() {
             </header>
 
             <main className="flex flex-1 overflow-hidden">
-                {isSiteListVisible && (
-                    <div className="w-1/4 flex flex-col border-r border-brand-700 max-w-xs">
-                        <div className="p-4 border-b border-brand-700 bg-brand-800"><h2 className="text-lg font-semibold text-white">Sites & Cameras</h2></div>
-                        <div className="flex-1 overflow-y-auto p-2 space-y-1 bg-brand-900">
-                            {monitoredDevices.map(site => (
-                                <div key={site._id} className="bg-brand-800 rounded-lg">
-                                    <div className="w-full flex justify-between items-center p-3 text-left">
-                                        <button onClick={() => toggleSite(site._id)} className="flex items-center flex-1">
-                                            {openSites[site._id] ? <ChevronDown size={18} className="mr-2" /> : <ChevronRight size={18} className="mr-2" />}
-                                            <h3 className="font-semibold text-accent">{site.name}</h3>
-                                        </button>
-                                        <button onClick={() => handleShowGrid(site)} title="Show site grid view" className="p-1 text-brand-400 hover:text-white"><Grid3x3 size={18} /></button>
-                                    </div>
-                                    {openSites[site._id] && (
-                                        <div className="border-t border-brand-700 p-2"><div className="space-y-1">
-                                            {site.cameras.map(camera => (<button key={camera.id} onClick={() => handleFocusCamera(camera, site)} className={`w-full text-left p-2 rounded text-sm hover:bg-brand-700 transition-colors ${focusedCamera?.id === camera.id && viewMode === 'focus' ? 'bg-accent text-brand-900 font-semibold' : 'text-brand-300'}`}>{camera.name}</button>))}
-                                        </div></div>
-                                    )}
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
-                
+                {/* Main alerts viewing area, empty for alerts-only mode */}
                 <div className="flex-1 p-4 flex flex-col items-center justify-center bg-black relative">
-                    {(focusedCamera || gridSite) && (<button onClick={() => { setFocusedCamera(null); setGridSite(null); }} className="absolute top-6 right-6 z-10 p-2 bg-black/50 rounded-full text-white hover:bg-black/80" title="Close View"><X size={24} /></button>)}
-                    {viewMode === 'focus' && focusedCamera && <CameraView key={focusedCamera.id} camera={focusedCamera} isFocused={true} />}
-                    {viewMode === 'grid' && gridSite && (
-                        <div className="w-full h-full">
-                            <h2 className="text-xl font-semibold text-white mb-4 text-center">{gridSite.name} - Grid View</h2>
-                            <div className={`w-full h-full grid gap-2 ${gridSite.cameras.length > 4 ? 'grid-cols-3' : 'grid-cols-2'} ${gridSite.cameras.length > 9 ? 'grid-cols-4' : ''}`}>
-                                {gridSite.cameras.map(cam => <CameraView key={cam.id} camera={cam} siteName={gridSite.name} isFocused={false}/>)}
-                            </div>
-                        </div>
-                    )}
-                    {viewMode === 'videoWall' && (
-                        <div className="w-full h-full flex flex-col">
-                             <h2 className="text-xl font-semibold text-white mb-4 text-center">Global Video Wall</h2>
-                             <div className={`w-full flex-1 grid gap-2 grid-cols-4`}>
-                                {monitoredDevices.flatMap(site => site.cameras.map(cam => (<CameraView key={cam.id} camera={cam} siteName={site.name} isFocused={false} isAlerting={cam.id === alertingCameraId} />)))}
-                            </div>
-                        </div>
-                    )}
-                    {!focusedCamera && !gridSite && viewMode !== 'videoWall' && (
-                        <div className="text-center text-brand-400">
-                             <Video size={48} className="mx-auto mb-4" />
-                            <h2 className="text-2xl text-brand-300 font-semibold">Live View</h2>
-                            <p className="mt-2">Select a camera or site to begin viewing.</p>
-                        </div>
-                    )}
+                    <div className="text-center text-brand-400">
+                        <X size={48} className="mx-auto mb-4" />
+                        <h2 className="text-2xl text-brand-300 font-semibold">Alerts Only Mode</h2>
+                        <p className="mt-2">Use the event log on the right to manage active incidents.</p>
+                    </div>
                 </div>
                 
                 {isAlertLogVisible && (
-                    <div className="w-1/4 flex flex-col border-l border-brand-700 max-w-sm">
+                    <div className="w-full flex flex-col border-l border-brand-700 max-w-sm">
                         <div className="p-4 border-b border-brand-700 bg-brand-800"><h2 className="text-lg font-semibold text-white">Real-time Event Log</h2></div>
                         <div className="flex-1 overflow-y-auto p-2 space-y-2 bg-brand-900">
                             {recentAlerts.map(alert => <AlertItem key={alert.id} alert={alert} onSelect={() => handleAlertSelect(alert)} isActive={viewingSiteId === alert.siteProfile._id} />)}
@@ -465,4 +359,4 @@ function AlertItem({ alert, onSelect, isActive }) {
     );
 }
 
-export default DispatcherDashboard;
+export default AlertsOnlyPage;

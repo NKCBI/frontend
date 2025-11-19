@@ -121,8 +121,27 @@ function IncidentModal({ siteName, alertsForSite, onClose, onAcknowledge, onReso
 
                     <div className="w-2/3 flex flex-col p-6 overflow-y-auto">
                         <div>
-                            <p className="text-sm text-brand-400 flex-shrink-0">Event Snapshot</p>
-                            <img src={selectedAlert.snapshotUrl} alt="Event snapshot" className="mt-2 rounded-lg w-full aspect-video object-cover bg-black flex-shrink-0" />
+                            <p className="text-sm text-brand-400 flex-shrink-0">Event Media</p>
+                            {selectedAlert.clipUrl ? (
+                                <video
+                                    key={selectedAlert.clipUrl} 
+                                    src={selectedAlert.clipUrl}
+                                    className="mt-2 rounded-lg w-full aspect-video object-contain bg-black flex-shrink-0"
+                                    controls
+                                    autoPlay
+                                    muted
+                                    loop
+                                    playsInline
+                                >
+                                    Your browser does not support the video tag.
+                                </video>
+                            ) : (
+                                <img 
+                                    src={selectedAlert.snapshotUrl} 
+                                    alt="Event snapshot" 
+                                    className="mt-2 rounded-lg w-full aspect-video object-cover bg-black flex-shrink-0" 
+                                />
+                            )}
                         </div>
                         
                         <div className="flex-1 grid grid-cols-2 gap-6 mt-6">
